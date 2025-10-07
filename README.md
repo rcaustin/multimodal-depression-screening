@@ -1,4 +1,46 @@
-# Multimodal FER for Depression Screening
+# Multimodal Depression Screening
+
+This repository contains code for a multimodal facial emotion recognition model for early depression screening, using text, audio, and visual features from the DAIC and EDAIC datasets.
+
+---
+
+## 🟢 Getting Started: Python Environment Setup
+
+Follow these steps to set up your development environment.
+
+### 1. Clone the repository
+
+```bash
+git clone <repository-url>
+cd <repository-directory>
+```
+
+### 2. Create a virtual environment
+
+```bash
+mkdir .venv
+virtualenv .venv
+```
+
+### 3. Activate the virtual environment
+
+Linux/macOS
+```bash
+source .venv/bin/activate
+```
+
+Windows
+```cmd
+.venv\Scripts\activate
+```
+
+### 4. Install project dependencies
+
+```bash
+pip install -r requirements.txt
+```
+
+---
 
 # Dataset Notice
 
