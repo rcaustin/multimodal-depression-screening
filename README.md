@@ -4,7 +4,7 @@ This repository contains code for a multimodal facial emotion recognition model 
 
 ---
 
-## 🟢 Getting Started: Python Environment Setup
+## Getting Started: Python Environment Setup
 
 Follow these steps to set up your development environment.
 
