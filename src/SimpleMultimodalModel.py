@@ -4,7 +4,7 @@ import torch.nn as nn
 
 class SimpleMultimodalModel(nn.Module):
     def __init__(
-            self, text_dim=768, audio_dim=88, visual_dim=4096, hidden_dim=256
+            self, text_dim=384, audio_dim=88, visual_dim=4096, hidden_dim=256
     ):
         super().__init__()
         self.text_fc = nn.Linear(text_dim, hidden_dim)
