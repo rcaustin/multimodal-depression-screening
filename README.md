@@ -15,14 +15,24 @@ git clone <repository-url>
 cd <repository-directory>
 ```
 
-### 2. Create a virtual environment
+### 2. Add project datasets
+```bash
+mkdir -p data/raw data/processed/sessions
+```
+
+Add compressed, archived data to data/raw/
+Add uncompressed, usable data to data/processed/sessions
+
+The current script expects data/processed/sessions to contain a directory for each session named with the corresponding session ID (e.g., 300, 301, 302, etc.) Text features must be present in the session directory (e.g., 300); video and audio features must be present in a features/ sub-directory (e.g., 300/features).
+
+### 3. Create a virtual environment
 
 ```bash
 mkdir .venv
 virtualenv .venv
 ```
 
-### 3. Activate the virtual environment
+### 4. Activate the virtual environment
 
 Linux/macOS
 ```bash
@@ -34,7 +44,7 @@ Windows
 .venv\Scripts\activate
 ```
 
-### 4. Install project dependencies
+### 5. Install project dependencies
 
 ```bash
 pip install -r requirements.txt
