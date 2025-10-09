@@ -96,7 +96,7 @@ class TextLoader:
 
         # Generate embedding
         if text.strip():
-            embedding = self.model.encode(text)
+            embedding = self.model.encode(text, device="cpu")
             # If embedding is multi-dimensional (e.g., sentence-level), average
             if embedding.ndim > 1:
                 embedding = np.mean(embedding, axis=0)

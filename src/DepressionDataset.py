@@ -6,7 +6,7 @@ from torch.utils.data import Dataset
 
 from src.loaders.AudioLoader import AudioLoader
 from src.loaders.TextLoader import TextLoader
-from src.loaders.VideoLoader import VideoLoader
+from src.loaders.VisualLoader import VisualLoader
 
 
 class DepressionDataset(Dataset):
@@ -51,7 +51,7 @@ class DepressionDataset(Dataset):
         if "audio" in modalities:
             self.loaders["audio"] = AudioLoader(cache=cache)
         if "visual" in modalities:
-            self.loaders["visual"] = VideoLoader(cache=cache)
+            self.loaders["visual"] = VisualLoader(cache=cache)
 
     def __len__(self):
         return len(self.session_ids)

@@ -1,10 +1,11 @@
 import os
+
 import numpy as np
-import scipy.io
+import pandas as pd
 from loguru import logger
 
 
-class VideoLoader:
+class VisualLoader:
     """
     Loader for visual features from precomputed CNN .mat files.
 
@@ -15,8 +16,14 @@ class VideoLoader:
     - Optional caching of loaded features
     """
 
-    def __init__(self, feature_file_template="{session_id}_CNN_VGG.mat",
-                 feature_size=4096, cache=True):
+    def __init__(
+            self,
+            feature_file_template=(
+                "{session_id}_OpenFace2.1.0_Pose_gaze_AUs.csv"
+            ),
+            feature_size=4096,
+            cache=True
+    ):
         """
         Args:
             feature_file_template: .mat filename template with session_id
@@ -40,52 +47,42 @@ class VideoLoader:
         """
         session_id = os.path.basename(session_dir)
 
-        # Check cache
+        # Check Cache
         if self.cache and session_id in self._cache_dict:
             return self._cache_dict[session_id]
 
-        mat_path = os.path.join(
+        # Construct File Path
+        csv_path = os.path.join(
             session_dir, "features",
             self.feature_file_template.format(session_id=session_id)
         )
 
-        if not os.path.exists(mat_path):
+        if not os.path.exists(csv_path):
             logger.warning(
-                f"[VideoLoader] Visual feature file not found for session "
+                f"[VisualLoader] Visual feature file not found for session "
                 f"{session_id}"
             )
             features = np.zeros(self.feature_size, dtype=np.float32)
         else:
             try:
-                mat = scipy.io.loadmat(mat_path)
-                # Choose first key that doesn't start with '__'
-                key = next(
-                    (k for k in mat.keys() if not k.startswith("__")), None
-                )
-                if key:
-                    data = np.array(mat[key], dtype=np.float32)
-                    # Mean pooling if multiple rows
-                    if data.ndim > 1:
-                        features = np.mean(data, axis=0)
-                    else:
-                        features = data
-                else:
-                    logger.warning(
-                        f"[VideoLoader] No valid key found in .mat for "
-                        f"session {session_id}"
-                    )
-                    features = np.zeros(self.feature_size, dtype=np.float32)
+                # Load CSV and Extract Relevant Columns
+                columns = [
+                    "AU01_r", "AU02_r", "AU04_r", "AU05_r", "AU06_r", "AU07_r",
+                    "AU09_r", "AU10_r", "AU12_r", "AU14_r", "AU15_r", "AU17_r",
+                    "AU20_r", "AU23_r", "AU25_r", "AU26_r", "AU45_r"
+                ]
 
-                # Ensure fixed size
-                if features.shape[0] < self.feature_size:
-                    features = np.pad(features, (0, self.feature_size -
-                                                 features.shape[0]))
-                elif features.shape[0] > self.feature_size:
-                    features = features[:self.feature_size]
+                # Load DataFrame and Handle Non-Numeric Data Gracefully
+                df = pd.read_csv(csv_path, usecols=columns)
+                df = df.apply(pd.to_numeric, errors='coerce').fillna(0.0)
+
+                # Pool Over Frames (Mean Pooling)
+                features = df.values.astype(np.float32)
+                features = np.mean(features, axis=0)
 
             except Exception as e:
                 logger.warning(
-                    f"[VideoLoader] Failed to load visual features for "
+                    f"[VisualLoader] Failed to load visual features for "
                     f"session {session_id}: {e}"
                 )
                 features = np.zeros(self.feature_size, dtype=np.float32)
