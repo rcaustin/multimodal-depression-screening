@@ -12,11 +12,12 @@ def main():
     # ---- Config ----
     modalities = ("text", "audio", "visual")
     batch_size = 4
-    num_workers = 2
+    num_workers = 0
     lr = 1e-3
     epochs = 10
-    use_cuda = torch.cuda.is_available()
-    device = torch.device("cuda" if use_cuda else "cpu")
+    # use_cuda = torch.cuda.is_available()
+    # device = torch.device("cuda" if use_cuda else "cpu")
+    device = torch.device("cpu")  # Force CPU for compatibility
 
     # ---- Initialize model, optimizer, loss ----
     logger.info("Initializing model...")
