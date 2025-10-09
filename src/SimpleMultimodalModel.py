@@ -9,7 +9,7 @@ class SimpleMultimodalModel(nn.Module):
     """
     def __init__(
         self,
-        text_input_dim=384,     # SentenceTransformer embedding size
+        text_input_dim=768,     # SentenceTransformer embedding size
         audio_input_dim=88,     # OpenSMILE audio feature size
         visual_input_dim=17,    # Facial AU feature size
         hidden_dim=256,         # Hidden layer dimension
