@@ -41,8 +41,12 @@ class DepressionDataset(Dataset):
 
         # Load metadata
         self.metadata = pd.read_csv(metadata_path)
-        self.session_ids = self.metadata["Participant_ID"].astype(str).tolist()
-        self.session_ids = ['300', '301', '302', '303', '304']
+        # self.session_ids = self.metadata["Participant_ID"].astype(str).tolist()
+
+        no_data_ids = ['342', '394', '398']
+        self.session_ids = [
+            str(num) for num in list(range(300, 446)) if str(num) not in no_data_ids
+        ]
 
         # Initialize modality loaders
         self.loaders = {}
@@ -66,9 +70,10 @@ class DepressionDataset(Dataset):
             features[mod] = loader.load(session_dir)
 
         # Load label
-        row = self.metadata.loc[
-            self.metadata["Participant_ID"].astype(str) == session_id
-        ].iloc[0]
+        matching_rows = self.metadata.loc[self.metadata["Participant_ID"].astype(str) == session_id]
+        if len(matching_rows) == 0:
+            raise ValueError(f"No metadata found for session {session_id}")
+        row = matching_rows.iloc[0]
         label = float(row["PHQ_Binary"])
 
         # Apply optional transform
