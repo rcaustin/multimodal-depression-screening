@@ -25,15 +25,14 @@ class TextLoader:
     ):
         """
         Args:
-            model_name: Name of the SentenceTransformer model to use
-            embedding_dim: Dimension of output embedding
-            cache: Whether to cache embeddings in memory
+            model_name: name of the SentenceTransformer model to use
+            embedding_dim: dimension of output embedding
+            cache: whether to cache embeddings in memory
         """
         self.embedding_dim = embedding_dim
         self.cache = cache
         self._cache_dict = {}
 
-        # Load SentenceTransformer model
         self.model = SentenceTransformer(model_name)
 
     def load(self, session_dir: str) -> np.ndarray:
@@ -48,65 +47,70 @@ class TextLoader:
         """
         session_id = os.path.basename(session_dir)
 
-        # Check cache
+        # Check Cache
         if self.cache and session_id in self._cache_dict:
             return self._cache_dict[session_id]
 
-        transcript_path_csv = os.path.join(
-            session_dir, f"{session_id}_Transcript.csv"
-        )
-        transcript_path_txt = os.path.join(
-            session_dir, f"{session_id}_transcript.txt"
-        )
+        transcript_path_csv = os.path.join(session_dir, f"{session_id}_Transcript.csv")
 
-        # Load text
-        text = ""
-        if os.path.exists(transcript_path_csv):
-            try:
-                df = pd.read_csv(transcript_path_csv)
-                # Find column with "Text" (case-insensitive)
-                text_col = next(
-                    (c for c in df.columns if "Text" in c.lower()), None
-                )
-                if text_col:
-                    text = " ".join(df[text_col].astype(str).tolist())
-                else:
-                    # Fallback: concatenate all columns
-                    text = " ".join(df.astype(str).sum(axis=1).tolist())
-            except Exception as e:
-                logger.warning(
-                    f"[TextLoader] Failed to read CSV transcript for "
-                    f"{session_id}: {e}"
-                )
-        elif os.path.exists(transcript_path_txt):
-            try:
-                with open(transcript_path_txt, "r", encoding="utf-8") as f:
-                    text = f.read()
-            except Exception as e:
-                logger.warning(
-                    f"[TextLoader] Failed to read TXT transcript for "
-                    f" {session_id}: {e}"
-                )
-        else:
-            # Missing transcript
-            logger.warning(
-                f"[TextLoader] Transcript not found for "
-                f"session {session_id}"
-            )
-
-        # Generate embedding
-        if text.strip():
-            embedding = self.model.encode(text, device="cpu")
-            # If embedding is multi-dimensional (e.g., sentence-level), average
-            if embedding.ndim > 1:
-                embedding = np.mean(embedding, axis=0)
-        else:
+        # Check File Existence; Return Zero Embedding if Missing
+        if not os.path.exists(transcript_path_csv):
+            logger.warning(f"[TextLoader] Transcript file missing for session {session_id}")
             embedding = np.zeros(self.embedding_dim, dtype=np.float32)
+            if self.cache:
+                self._cache_dict[session_id] = embedding
+            return embedding
 
-        embedding = embedding.astype(np.float32)
+        # Load Text from CSV to Single Concatenated String
+        text = self._load_text(transcript_path_csv)
+
+        # Generate Embedding for Text
+        embedding = self._generate_embedding(text)
 
         # Cache result
         if self.cache:
             self._cache_dict[session_id] = embedding
 
         return embedding
+
+    def _load_text(self, transcript_path_csv: str) -> str:
+        """
+        Load raw text from a transcript CSV file.
+
+        Args:
+            transcript_path_csv: Path to the transcript CSV file
+
+        Returns:
+            text: concatenated text from the transcript
+        """
+        try:
+            df = pd.read_csv(transcript_path_csv)
+            text_column = next((c for c in df.columns if "text" in c.lower()), None)
+            if text_column:
+                return " ".join(df[text_column].astype(str).tolist())
+            else:
+                return ""
+        except Exception as e:
+            logger.warning(f"[TextLoader] Failed to read {transcript_path_csv}: {e}")
+            return ""
+
+    def _generate_embedding(self, text: str) -> np.ndarray:
+        """
+        Generate embedding for given text.
+
+        Args:
+            text: input text string
+
+        Returns:
+            embedding: np.ndarray of shape (embedding_dim,)
+        """
+        if text.strip():
+            embedding = self.model.encode(text, device="cpu")
+            # If embedding is multi-dimensional (e.g., sentence-level), average
+            if embedding.ndim > 1:
+                embedding = np.mean(embedding, axis=0)
+        else:
+            # Return Zero Embedding for Empty Text
+            embedding = np.zeros(self.embedding_dim, dtype=np.float32)
+
+        return embedding.astype(np.float32)
