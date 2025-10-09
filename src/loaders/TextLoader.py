@@ -40,7 +40,7 @@ class TextLoader:
         Load and embed transcript for a single session.
 
         Args:
-            session_dir: Path to the session directory
+            session_dir: path to the session directory
 
         Returns:
             embedding: np.ndarray of shape (embedding_dim,)
@@ -78,7 +78,7 @@ class TextLoader:
         Load raw text from a transcript CSV file.
 
         Args:
-            transcript_path_csv: Path to the transcript CSV file
+            transcript_path_csv: path to the transcript CSV file
 
         Returns:
             text: concatenated text from the transcript
