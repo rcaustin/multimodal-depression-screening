@@ -19,7 +19,7 @@ class TextLoader:
 
     def __init__(
         self,
-        model_name: str = "all-MiniLM-L6-v2",
+        model_name: str = "all-MPNet-base-v2",
         embedding_dim: int = 384,
         cache: bool = True,
     ):
