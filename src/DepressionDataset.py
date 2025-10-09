@@ -93,12 +93,14 @@ class DepressionDataset(Dataset):
         visual_path = os.path.join(
             self.data_dir,
             session_id,
-            f"features/{session_id}_CNN_VGG.mat"
+            f"features/{session_id}_OpenFace2.1.0_Pose_gaze_AUs.csv"
         )
 
         # Handle missing visual files
         if not os.path.exists(visual_path):
             return np.zeros(4096, dtype=np.float32)  # Typical VGG feature size
+        """
+        Temporarily disabled - loading form .csv
 
         # Load visual features from .mat file
         mat = scipy.io.loadmat(visual_path)
@@ -109,6 +111,13 @@ class DepressionDataset(Dataset):
             if features.ndim > 1:
                 features = np.mean(features, axis=0)
             return features
+        """
+        # Load AUs
+        # coerce errors to NaN, fill NaN with 0
+        df = pd.read_csv(visual_path, usecols=["AU01_r","AU02_r","AU04_r","AU05_r","AU06_r","AU07_r","AU09_r","AU10_r","AU12_r","AU14_r","AU15_r","AU17_r","AU20_r","AU23_r","AU25_r","AU26_r","AU45_r"])
+        df = df.apply(pd.to_numeric, errors='coerce').fillna(0.0)
+        features = df.values.astype(np.float32)
+        return features
 
         return np.zeros(4096, dtype=np.float32)  # Typical VGG feature size
 
