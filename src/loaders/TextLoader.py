@@ -1,4 +1,6 @@
 import os
+import re
+import string
 
 import numpy as np
 import pandas as pd
@@ -61,8 +63,8 @@ class TextLoader:
                 self._cache_dict[session_id] = embedding
             return embedding
 
-        # Load Text from CSV to Single Concatenated String
-        text = self._load_text(transcript_path_csv)
+        # Load Text from CSV, Clean, and Preprocess
+        text = self._clean_text(self._load_text(transcript_path_csv))
 
         # Generate Embedding for Text
         embedding = self._generate_embedding(text)
@@ -114,3 +116,25 @@ class TextLoader:
             embedding = np.zeros(self.embedding_dim, dtype=np.float32)
 
         return embedding.astype(np.float32)
+
+    def _clean_text(self, text: str) -> str:
+        """
+        Basic text cleaning: lowercasing and removing extra whitespace.
+
+        Args:
+            text: raw input text
+
+        Returns:
+            cleaned_text: cleaned text
+        """
+        # Lowercase
+        text = text.lower()
+
+        # Remove Filler Words and Punctuation
+        text = re.sub(r"\b(um|uh|like|you know|i mean)\b", "", text)
+        text = text.translate(str.maketrans("", "", string.punctuation))
+
+        # Remove Extra Whitespace
+        text = re.sub(r"\s+", " ", text).strip()
+
+        return text.strip()
