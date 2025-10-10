@@ -7,10 +7,10 @@ from loguru import logger
 
 class VisualLoader:
     """
-    Loader for visual features from precomputed CNN .mat files.
+    Loader for visual features from precomputed OpenFace CSV files.
 
     Responsibilities:
-    - Load session-level visual features (e.g., VGG, ResNet)
+    - Load session-level visual features (Action Units)
     - Handle missing or malformed files gracefully
     - Pool over frames to create a fixed-length vector
     - Optional caching of loaded features
@@ -21,17 +21,16 @@ class VisualLoader:
             feature_file_template=(
                 "{session_id}_OpenFace2.1.0_Pose_gaze_AUs.csv"
             ),
-            fixed_dim=4096,
+            fixed_dim=None,
             cache=True
     ):
         """
         Args:
-            feature_file_template: .mat filename template with session_id
-            feature_size: Dimension of output feature vector
+            feature_file_template: .csv filename template with session_id
+            fixed_dim: dimension of output feature vector
             cache: Whether to cache features in memory
         """
         self.feature_file_template = feature_file_template
-        self.fixed_dim = fixed_dim
         self.cache = cache
         self._cache_dict = {}
 
@@ -41,6 +40,9 @@ class VisualLoader:
             "AU09_r", "AU10_r", "AU12_r", "AU14_r", "AU15_r", "AU17_r",
             "AU20_r", "AU23_r", "AU25_r", "AU26_r", "AU45_r"
         ]
+
+        # Fixed Dimension (Number of Action Units)
+        self.fixed_dim = fixed_dim or len(self.action_units)
 
     def load(self, session_dir: str) -> np.ndarray:
         """
@@ -92,7 +94,7 @@ class VisualLoader:
                 .apply(pd.to_numeric, errors='coerce')
                 .fillna(0.0)
             )
-            return df.values.astype(np.float32)
+            return df.to_numpy(dtype=np.float32, copy=False)
 
         except Exception as e:
             logger.warning(f"[VisualLoader] Failed to load CSV file {csv_path}: {e}")
@@ -108,6 +110,11 @@ class VisualLoader:
         Returns:
             embedding: np.ndarray of shape (fixed_dim,)
         """
+        # Handle Empty Data
+        if visual_data.size == 0:
+            logger.warning("[VisualLoader] No visual data found; returning zero embedding")
+            return np.zeros(self.fixed_dim, dtype=np.float32)
+
         if visual_data.ndim == 2:
             embedding = np.mean(visual_data, axis=0)
         elif visual_data.ndim == 1:
