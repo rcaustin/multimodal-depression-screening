@@ -52,19 +52,12 @@ class AudioLoader:
         if self.cache and session_id in self._cache_dict:
             return self._cache_dict[session_id]
 
+        # Construct File Path
         audio_path = os.path.join(
             session_dir,
             "features",
             self.feature_file_template.format(session_id=session_id)
         )
-
-        # Check File Existence; Return Zero Embedding if Missing
-        if not os.path.exists(audio_path):
-            logger.warning(f"[AudioLoader] Audio feature file not found for session {session_id}")
-            embedding = np.zeros(self.fixed_dim, dtype=np.float32)
-            if self.cache:
-                self._cache_dict[session_id] = embedding
-            return embedding
 
         # Load CSV
         audio_data = self._load_csv(audio_path)
@@ -82,12 +75,13 @@ class AudioLoader:
         Load CSV file and return as numpy array.
 
         Args:
-            path: Path to the CSV file
+            path: path to the CSV file
 
         Returns:
             np.ndarray of shape (n_samples, n_features)
         """
         try:
+            # Load DataFrame and Handle Non-Numeric Data Gracefully
             df = pd.read_csv(path)
             df = (
                 df.select_dtypes(include=[np.number])
@@ -95,6 +89,7 @@ class AudioLoader:
                 .fillna(0.0)
             )
             return df.values.astype(np.float32)
+
         except Exception as e:
             logger.warning(f"[AudioLoader] Failed to load CSV file {path}: {e}")
             return np.array([], dtype=np.float32)
