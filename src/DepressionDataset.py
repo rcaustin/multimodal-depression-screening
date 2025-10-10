@@ -39,13 +39,12 @@ class DepressionDataset(Dataset):
         self.modalities = modalities
         self.transform = transform
 
-        # Load metadata
         self.metadata = pd.read_csv(metadata_path)
-        # self.session_ids = self.metadata["Participant_ID"].astype(str).tolist()
 
-        no_data_ids = ['342', '394', '398']
+        # List of Session IDs (Folder Names, Corresponding to Participant_ID in metadata)
         self.session_ids = [
-            str(num) for num in list(range(300, 446)) if str(num) not in no_data_ids
+            name for name in self.metadata["Participant_ID"].astype(str).tolist()
+            if os.path.isdir(os.path.join(data_dir, name))
         ]
 
         # Initialize modality loaders
