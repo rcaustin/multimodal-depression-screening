@@ -44,7 +44,7 @@ class AudioLoader:
             session_dir: Path to the session directory
 
         Returns:
-            embedding: np.ndarray of shape (fixed_dim,)
+            session_embedding: np.ndarray of shape (fixed_dim,)
         """
         session_id = os.path.basename(session_dir)
 
@@ -60,29 +60,29 @@ class AudioLoader:
         )
 
         # Load CSV
-        audio_data = self._load_csv(audio_path)
+        frame_features = self._load_csv(audio_path)
 
         # Pool over Frames and Ensure Fixed Dimension
-        embedding = self._generate_embedding(audio_data)
+        session_embedding = self._generate_embedding(frame_features)
 
         if self.cache:
-            self._cache_dict[session_id] = embedding
+            self._cache_dict[session_id] = session_embedding
 
-        return embedding
+        return session_embedding
 
-    def _load_csv(self, path: str) -> np.ndarray:
+    def _load_csv(self, csv_path: str) -> np.ndarray:
         """
         Load CSV file and return as numpy array.
 
         Args:
-            path: path to the CSV file
+            csv_path: path to the CSV file
 
         Returns:
             np.ndarray of shape (n_samples, n_features)
         """
         try:
             # Load DataFrame and Handle Non-Numeric Data Gracefully
-            df = pd.read_csv(path)
+            df = pd.read_csv(csv_path)
             df = (
                 df.select_dtypes(include=[np.number])
                 .apply(pd.to_numeric, errors="coerce")
@@ -91,7 +91,7 @@ class AudioLoader:
             return df.values.astype(np.float32)
 
         except Exception as e:
-            logger.warning(f"[AudioLoader] Failed to load CSV file {path}: {e}")
+            logger.warning(f"[AudioLoader] Failed to load CSV file {csv_path}: {e}")
             return np.array([], dtype=np.float32)
 
     def _generate_embedding(self, audio_data: np.ndarray) -> np.ndarray:
@@ -115,7 +115,11 @@ class AudioLoader:
         # Ensure Fixed Dimension
         if embedding.shape[0] < self.fixed_dim:
             # Pad to Fixed Dimension
-            embedding = np.pad(embedding, (0, self.fixed_dim - embedding.shape[0]))
+            embedding = np.pad(
+                embedding,
+                (0, self.fixed_dim - embedding.shape[0]),
+                mode='constant'
+            ).astype(np.float32)
         elif embedding.shape[0] > self.fixed_dim:
             # Truncate to Fixed Dimension
             embedding = embedding[:self.fixed_dim]
