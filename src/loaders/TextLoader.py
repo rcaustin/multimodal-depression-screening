@@ -22,7 +22,7 @@ class TextLoader:
     def __init__(
         self,
         model_name: str = "all-MPNet-base-v2",
-        embedding_dim: int = 384,
+        embedding_dim: int = 768,
         cache: bool = True,
     ):
         """
