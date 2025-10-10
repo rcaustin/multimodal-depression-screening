@@ -67,15 +67,15 @@ class VisualLoader:
         )
 
         # Load CSV
-        visual_data = self._load_csv(csv_path)
+        frame_data = self._load_csv(csv_path)
 
         # Pool over Frames and Ensure Fixed Dimension
-        embeddings = self._generate_embedding(visual_data)
+        session_embedding = self._generate_embedding(frame_data)
 
         if self.cache:
-            self._cache_dict[session_id] = embeddings
+            self._cache_dict[session_id] = session_embedding
 
-        return embeddings
+        return session_embedding
 
     def _load_csv(self, csv_path: str) -> np.ndarray:
         """
