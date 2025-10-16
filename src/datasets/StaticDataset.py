@@ -43,8 +43,8 @@ class StaticDataset(Dataset):
 
         # List of Session IDs (Folder Names, Corresponding to Participant_ID in metadata)
         self.session_ids = [
-            name for name in self.metadata["Participant_ID"].astype(str).tolist()
-            if os.path.isdir(os.path.join(data_dir, name))
+            str(pid) for pid in self.metadata["Participant_ID"].tolist()
+            if os.path.isdir(os.path.join(data_dir, str(pid)))
         ]
 
         # Initialize modality loaders
