@@ -3,7 +3,7 @@ import torch.nn as nn
 from loguru import logger
 from torch.utils.data import DataLoader
 
-from src.DepressionDataset import DepressionDataset
+from src.datasets.StaticDataset import StaticDataset
 
 
 class Trainer:
@@ -29,7 +29,7 @@ class Trainer:
         self.model.to(self.device)
 
         # Dataset & dataloader
-        self.dataset = DepressionDataset(modalities=self.modalities, cache=True)
+        self.dataset = StaticDataset(modalities=self.modalities, cache=True)
         self.dataloader = DataLoader(
             self.dataset, batch_size=self.batch_size, shuffle=True, num_workers=0
         )

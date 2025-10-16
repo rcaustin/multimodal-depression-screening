@@ -4,12 +4,12 @@ import pandas as pd
 import torch
 from torch.utils.data import Dataset
 
-from src.loaders.AudioLoader import AudioLoader
-from src.loaders.TextLoader import TextLoader
-from src.loaders.VisualLoader import VisualLoader
+from src.loaders.static.AudioLoader import AudioLoader
+from src.loaders.static.TextLoader import TextLoader
+from src.loaders.static.VisualLoader import VisualLoader
 
 
-class DepressionDataset(Dataset):
+class StaticDataset(Dataset):
     """
     PyTorch Dataset for multimodal depression classification.
 
