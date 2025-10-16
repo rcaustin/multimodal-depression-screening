@@ -2,7 +2,7 @@ import torch
 import torch.nn as nn
 
 
-class SimpleMultimodalModel(nn.Module):
+class StaticModel(nn.Module):
     """
     Simple multimodal neural network for depression classification.
     Processes text, audio, and visual features, then fuses them.

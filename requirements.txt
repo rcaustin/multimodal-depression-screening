@@ -13,6 +13,7 @@ fsspec==2025.9.0
 hf-xet==1.1.10
 huggingface-hub==0.35.3
 idna==3.10
+iniconfig==2.1.0
 Jinja2==3.1.6
 joblib==1.5.2
 kiwisolver==1.4.9
@@ -41,8 +42,11 @@ nvidia-nvtx-cu12==12.8.90
 packaging==25.0
 pandas==2.3.3
 pillow==11.3.0
+pluggy==1.6.0
 propcache==0.4.0
+Pygments==2.19.2
 pyparsing==3.2.5
+pytest==8.4.2
 python-dateutil==2.9.0.post0
 pytorch-lightning==2.5.5
 pytz==2025.2

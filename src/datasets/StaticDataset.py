@@ -4,12 +4,12 @@ import pandas as pd
 import torch
 from torch.utils.data import Dataset
 
-from src.loaders.AudioLoader import AudioLoader
-from src.loaders.TextLoader import TextLoader
-from src.loaders.VisualLoader import VisualLoader
+from src.loaders.static.AudioLoader import AudioLoader
+from src.loaders.static.TextLoader import TextLoader
+from src.loaders.static.VisualLoader import VisualLoader
 
 
-class DepressionDataset(Dataset):
+class StaticDataset(Dataset):
     """
     PyTorch Dataset for multimodal depression classification.
 
@@ -43,8 +43,8 @@ class DepressionDataset(Dataset):
 
         # List of Session IDs (Folder Names, Corresponding to Participant_ID in metadata)
         self.session_ids = [
-            name for name in self.metadata["Participant_ID"].astype(str).tolist()
-            if os.path.isdir(os.path.join(data_dir, name))
+            str(pid) for pid in self.metadata["Participant_ID"].tolist()
+            if os.path.isdir(os.path.join(data_dir, str(pid)))
         ]
 
         # Initialize modality loaders
