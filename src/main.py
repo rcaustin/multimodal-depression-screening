@@ -29,15 +29,7 @@ def main():
     if args.mode == "static":
         model = StaticModel()
     elif args.mode == "temporal":
-        model = TemporalModel(
-            text_dim=768,
-            audio_dim=88,
-            visual_dim=17,
-            hidden_dim=128,
-            encoder_type="lstm",
-            pooling="mean",
-            dropout=0.3,
-        )
+        model = TemporalModel()
     else:
         raise ValueError(f"Unknown mode: {args.mode}")
 
