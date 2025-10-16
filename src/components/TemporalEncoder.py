@@ -80,6 +80,10 @@ class TemporalEncoder(nn.Module):
             Tensor: encoded sequence representation of shape [batch_size, hidden_dim].
         """
 
+        # Ensure input has 3 dimensions
+        if input_sequence.ndim == 2:
+            input_sequence = input_sequence.unsqueeze(1)  # Add seq_len=1 if missing
+
         if self.model_type == "lstm":
             sequence_outputs, (final_hidden_state, _) = self.encoder(input_sequence)
 
