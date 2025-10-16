@@ -1,5 +1,6 @@
 import pytest
 import torch
+
 from src.components.TemporalEncoder import TemporalEncoder
 
 

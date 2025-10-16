@@ -1,6 +1,7 @@
 import pytest
 import torch
-from src.TemporalMultimodalModel import TemporalMultimodalModel
+
+from src.TemporalModel import TemporalModel
 
 
 @pytest.mark.parametrize("batch_size", [2, 4])
@@ -12,7 +13,7 @@ def test_output_shape(batch_size, seq_len, encoder_type, pooling):
     text_dim, audio_dim, visual_dim = 128, 128, 128
     hidden_dim = 64
 
-    model = TemporalMultimodalModel(
+    model = TemporalModel(
         text_dim=text_dim,
         audio_dim=audio_dim,
         visual_dim=visual_dim,
@@ -41,7 +42,7 @@ def test_gradients_flow(encoder_type):
     text_dim, audio_dim, visual_dim = 8, 8, 8
     hidden_dim = 32
 
-    model = TemporalMultimodalModel(
+    model = TemporalModel(
         text_dim=text_dim,
         audio_dim=audio_dim,
         visual_dim=visual_dim,
@@ -66,7 +67,7 @@ def test_gradients_flow(encoder_type):
 
 def test_single_timestep():
     """Test that the model can handle sequence length = 1."""
-    model = TemporalMultimodalModel(
+    model = TemporalModel(
         text_dim=16, audio_dim=12, visual_dim=8, hidden_dim=32, encoder_type="lstm", pooling="last"
     )
 
@@ -84,7 +85,7 @@ def test_variable_sequence_length():
     text_dim, audio_dim, visual_dim = 8, 8, 8
     hidden_dim = 16
 
-    model = TemporalMultimodalModel(
+    model = TemporalModel(
         text_dim=text_dim,
         audio_dim=audio_dim,
         visual_dim=visual_dim,
