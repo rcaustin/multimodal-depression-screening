@@ -72,51 +72,44 @@ class TemporalEncoder(nn.Module):
 
     def forward(self, input_sequence: torch.Tensor) -> torch.Tensor:
         """
-        Forward pass for temporal encoding.
+        Forward pass for the temporal encoder.
 
         Args:
             input_sequence (Tensor): [batch_size, seq_len, input_dim]
 
         Returns:
-            Tensor:
-                - [batch_size, hidden_dim] if pooling is specified
-                - [batch_size, seq_len, hidden_dim] if pooling=None
+            Tensor: either pooled [B, H] or full sequence [B, T, H] if pooling=None
         """
-
         # Ensure input has 3 dimensions
         if input_sequence.ndim == 2:
-            input_sequence = input_sequence.unsqueeze(1)
+            input_sequence = input_sequence.unsqueeze(1)  # Add seq_len=1 if missing
 
         if self.model_type == "lstm":
             sequence_outputs, (final_hidden_state, _) = self.encoder(input_sequence)
-
-            if self.pooling == "last":
-                pooled_output = final_hidden_state[-1]
-            elif self.pooling == "mean":
-                pooled_output = sequence_outputs.mean(dim=1)
-            elif self.pooling == "max":
-                pooled_output, _ = sequence_outputs.max(dim=1)
-            elif self.pooling is None:
-                pooled_output = sequence_outputs
-            else:
-                raise ValueError(f"Unsupported pooling type: {self.pooling}")
-
         elif self.model_type == "transformer":
             sequence_outputs = self.encoder(input_sequence)
-            projected_outputs = self.output_projection(sequence_outputs)
+            sequence_outputs = self.output_projection(sequence_outputs)
+        else:
+            raise ValueError(f"Unsupported model_type: {self.model_type}")
 
-            if self.pooling == "mean":
-                pooled_output = projected_outputs.mean(dim=1)
-            elif self.pooling == "max":
-                pooled_output, _ = projected_outputs.max(dim=1)
-            elif self.pooling == "last":
-                pooled_output = projected_outputs[:, -1, :]
-            elif self.pooling is None:
-                pooled_output = projected_outputs
-            else:
-                raise ValueError(f"Unsupported pooling type: {self.pooling}")
+        if self.pooling is None:
+            # Return the full sequence without pooling
+            normalized_output = self.layer_norm(sequence_outputs)
+            return normalized_output
 
-        # Apply layer normalization
+        # Standard pooling
+        if self.pooling == "last":
+            pooled_output = (
+                final_hidden_state[-1]
+                if self.model_type == "lstm"
+                else sequence_outputs[:, -1, :]
+            )
+        elif self.pooling == "mean":
+            pooled_output = sequence_outputs.mean(dim=1)
+        elif self.pooling == "max":
+            pooled_output, _ = sequence_outputs.max(dim=1)
+        else:
+            raise ValueError(f"Unsupported pooling type: {self.pooling}")
+
         normalized_output = self.layer_norm(pooled_output)
-
         return normalized_output
