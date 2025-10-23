@@ -1,121 +1,113 @@
 # src/loaders/temporal/AudioLoader.py
 import os
-import torch
+
 import numpy as np
 import pandas as pd
+import torch
 from loguru import logger
 
 
 class AudioLoader:
     """
-    Loader for temporal audio data (frame-level features per session).
+    Loader for temporal audio features from OpenSMILE CSV files.
 
     Responsibilities:
-        - Load audio features for a given session directory
-        - Return tensor of shape [seq_len, feature_dim]
-        - Optionally implement caching to avoid repeated disk reads
-        - Optionally normalize features
+    - Load frame-level audio features for a session
+    - Enforce consistent per-frame feature dimension
+    - Handle missing files gracefully
+    - Cache sequences in memory
     """
 
     def __init__(
         self,
         feature_file_template: str = "{session_id}_BoAW_openSMILE_2.3.0_eGeMAPS.csv",
+        feature_dim: int = 88,
         cache: bool = True,
-        normalize: bool = True,
     ):
+        """
+        Args:
+            feature_file_template: CSV filename template with {session_id}
+            feature_dim: Number of features per frame
+            cache: Whether to cache sequences in memory
+        """
         self.feature_file_template = feature_file_template
+        self.feature_dim = feature_dim
         self.cache = cache
-        self._cache_store = {}
-        self.normalize = normalize
+        self._cache_dict = {}
 
     def load(self, session_dir: str) -> torch.Tensor:
         """
-        Load the audio sequence for the given session.
-
-        Args:
-            session_dir (str): Path to session folder.
+        Load the temporal audio sequence for a single session.
 
         Returns:
-            torch.Tensor: [seq_len, feature_dim]
+            Tensor of shape [seq_len, feature_dim]
         """
-        # derive session_id from folder name; remove trailing "_P" if present
-        dirname = os.path.basename(session_dir)
-        session_id = dirname[:-2] if dirname.endswith("_P") else dirname
+        session_id = os.path.basename(session_dir)
 
-        # Check cache
-        if self.cache and session_id in self._cache_store:
-            return self._cache_store[session_id]
+        # Return cached sequence if available
+        if self.cache and session_id in self._cache_dict:
+            return self._cache_dict[session_id]
 
-        # Construct file path
-        audio_path = os.path.join(
+        # Construct CSV path
+        csv_path = os.path.join(
             session_dir,
             "features",
             self.feature_file_template.format(session_id=session_id),
         )
 
         # Load CSV
-        frame_features = self._load_csv(audio_path)
+        frame_data = self._load_csv(csv_path)
 
-        # Normalize features (optional)
-        if self.normalize:
-            frame_features = self._normalize(frame_features)
+        # Handle missing/empty data
+        if frame_data is None or frame_data.shape[0] == 0:
+            logger.warning(
+                f"[AudioLoader] No audio data for session {session_id}, returning zero frame."
+            )
+            frame_data = np.zeros((1, self.feature_dim), dtype=np.float32)
 
-        # Convert to torch tensor
-        audio_tensor = torch.from_numpy(frame_features).float()
+        # Ensure correct per-frame feature dimension
+        frame_data = self._fix_feature_dim(frame_data)
 
-        logger.info(
-            f"[TemporalAudioLoader] Returned tensor shape for {session_id}: {tuple(audio_tensor.shape)}"
-        )  # temporary
+        # Convert to torch.Tensor
+        frame_tensor = torch.from_numpy(frame_data).float()
 
+        # Cache
         if self.cache:
-            self._cache_store[session_id] = audio_tensor
+            self._cache_dict[session_id] = frame_tensor
 
-        return audio_tensor
+        return frame_tensor
 
-    def _load_csv(self, csv_path: str) -> np.ndarray:
-        """
-        Load CSV file and return as numpy array.
-
-        Args:
-            csv_path: path to the CSV file
-
-        Returns:
-            np.ndarray of shape (n_samples, n_features)
-        """
+    def _load_csv(self, csv_path: str) -> np.ndarray | None:
+        """Load CSV as numpy array of shape [num_frames, num_features]."""
         try:
             df = pd.read_csv(csv_path)
-
-            # Drop the first two columns: unknown + timestamp
-            df = df.iloc[:, 2:]  # keep only feature columns
-
-            # Keep numeric columns and clean them
+            # Keep only numeric columns
             df = (
                 df.select_dtypes(include=[np.number])
                 .apply(pd.to_numeric, errors="coerce")
                 .fillna(0.0)
             )
-
-            return df.values.astype(np.float32)
-
+            return df.to_numpy(dtype=np.float32)
         except Exception as e:
-            logger.warning(f"[AudioLoader] Failed to load CSV file {csv_path}: {e}")
-            return np.zeros((0, 0), dtype=np.float32)
+            logger.warning(f"[AudioLoader] Failed to load CSV {csv_path}: {e}")
+            return None
 
-    def _normalize(self, data: np.ndarray) -> np.ndarray:
+    def _fix_feature_dim(self, data: np.ndarray) -> np.ndarray:
         """
-        Z-score normalize each feature column (frame-level).
+        Pad or truncate frames to match feature_dim.
 
         Args:
-            data: np.ndarray of shape [seq_len, feature_dim]
+            data: [seq_len, n_features]
 
         Returns:
-            np.ndarray: normalized data [seq_len, feature_dim]
+            np.ndarray: [seq_len, feature_dim]
         """
-        if data.size == 0:
-            return data
+        seq_len, n_features = data.shape
 
-        mean = data.mean(axis=0, keepdims=True)
-        std = data.std(axis=0, keepdims=True)
-        std[std == 0] = 1.0  # avoid division by zero
-        normalized = (data - mean) / std
-        return normalized
+        if n_features < self.feature_dim:
+            pad_width = self.feature_dim - n_features
+            data = np.pad(data, ((0, 0), (0, pad_width)), mode="constant")
+        elif n_features > self.feature_dim:
+            data = data[:, : self.feature_dim]
+
+        return data.astype(np.float32)
