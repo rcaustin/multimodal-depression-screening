@@ -63,7 +63,7 @@ class VisualLoader:
 
         # Check Cache
         if self.cache and session_id in self._cache_dict:
-            return self._cache_dict[session_id]
+            return self._cache_store[session_id]
 
         # Construct File Path
         csv_path = os.path.join(
