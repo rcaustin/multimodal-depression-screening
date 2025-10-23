@@ -50,7 +50,7 @@ class AudioLoader:
         audio_path = os.path.join(
             session_dir,
             "features",
-            self.feature_file_template.format(session_id=session_id)
+            self.feature_file_template.format(session_id=session_id),
         )
 
         # Load CSV
@@ -63,7 +63,9 @@ class AudioLoader:
         # Convert to torch tensor
         audio_tensor = torch.from_numpy(frame_features).float()
 
-        logger.info(f"[TemporalAudioLoader] Returned tensor shape for {session_id}: {tuple(audio_tensor.shape)}")  # temporary
+        logger.info(
+            f"[TemporalAudioLoader] Returned tensor shape for {session_id}: {tuple(audio_tensor.shape)}"
+        )  # temporary
 
         if self.cache:
             self._cache_store[session_id] = audio_tensor

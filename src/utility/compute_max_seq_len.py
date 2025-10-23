@@ -44,7 +44,8 @@ def count_audio_rows(audio_path):
 def main():
     metadata = pd.read_csv(METADATA_PATH)
     session_ids = [
-        str(pid) for pid in metadata["Participant_ID"].tolist()
+        str(pid)
+        for pid in metadata["Participant_ID"].tolist()
         if os.path.isdir(os.path.join(DATA_DIR, str(pid)))
     ]
 

@@ -59,6 +59,7 @@ class TextLoader:
 
     def _glob_first(self, session_dir: str, pattern: str) -> Optional[str]:
         import glob
+
         matches = sorted(glob.glob(os.path.join(session_dir, pattern)))
         return matches[0] if matches else None
 
@@ -67,11 +68,16 @@ class TextLoader:
             arr = np.load(path)
         elif path.endswith(".csv"):
             import pandas as pd
-            arr = pd.read_csv(path, header=None).select_dtypes(include=[np.number]).values
+
+            arr = (
+                pd.read_csv(path, header=None).select_dtypes(include=[np.number]).values
+            )
         else:
             raise ValueError(f"Unsupported text feature file: {path}")
         if arr.ndim != 2:
-            raise ValueError(f"Text features must be 2D [T, D], got shape {arr.shape} at {path}")
+            raise ValueError(
+                f"Text features must be 2D [T, D], got shape {arr.shape} at {path}"
+            )
         return arr.astype(np.float32, copy=False)
 
     def _embed_transcript(self, path: str) -> np.ndarray:
@@ -79,6 +85,7 @@ class TextLoader:
         # Read raw text, split lines -> sentences; ignore empties.
         if path.endswith(".csv"):
             import pandas as pd
+
             df = pd.read_csv(path)
             cand = None
             for c in df.columns:
@@ -88,7 +95,11 @@ class TextLoader:
             if cand is not None:
                 lines = [str(t).strip() for t in df[cand].tolist() if str(t).strip()]
             else:
-                lines = [str(s).strip() for s in df.astype(str).values.ravel() if str(s).strip()]
+                lines = [
+                    str(s).strip()
+                    for s in df.astype(str).values.ravel()
+                    if str(s).strip()
+                ]
         else:
             with io.open(path, "r", encoding="utf-8", errors="ignore") as f:
                 lines = [ln.strip() for ln in f.read().splitlines() if ln.strip()]
@@ -96,9 +107,13 @@ class TextLoader:
         if not lines:
             return np.zeros((0, 0), dtype=np.float32)
 
-        embs = self._st_model.encode(lines, convert_to_numpy=True, normalize_embeddings=False)
+        embs = self._st_model.encode(
+            lines, convert_to_numpy=True, normalize_embeddings=False
+        )
         if embs.ndim != 2:
-            raise ValueError(f"Expected 2D embeddings from SentenceTransformer, got {embs.shape}")
+            raise ValueError(
+                f"Expected 2D embeddings from SentenceTransformer, got {embs.shape}"
+            )
         return embs.astype(np.float32, copy=False)
 
     def _postprocess(self, arr: np.ndarray) -> np.ndarray:

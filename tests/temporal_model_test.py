@@ -68,7 +68,12 @@ def test_gradients_flow(encoder_type):
 def test_single_timestep():
     """Test that the model can handle sequence length = 1."""
     model = TemporalModel(
-        text_dim=16, audio_dim=12, visual_dim=8, hidden_dim=32, encoder_type="lstm", pooling="last"
+        text_dim=16,
+        audio_dim=12,
+        visual_dim=8,
+        hidden_dim=32,
+        encoder_type="lstm",
+        pooling="last",
     )
 
     text_seq = torch.randn(2, 1, 16)

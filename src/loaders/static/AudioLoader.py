@@ -19,9 +19,7 @@ class AudioLoader:
 
     def __init__(
         self,
-        feature_file_template: str = (
-            "{session_id}_BoAW_openSMILE_2.3.0_eGeMAPS.csv"
-        ),
+        feature_file_template: str = ("{session_id}_BoAW_openSMILE_2.3.0_eGeMAPS.csv"),
         fixed_dim: int = 88,
         cache: bool = True,
     ):
@@ -56,7 +54,7 @@ class AudioLoader:
         audio_path = os.path.join(
             session_dir,
             "features",
-            self.feature_file_template.format(session_id=session_id)
+            self.feature_file_template.format(session_id=session_id),
         )
 
         # Load CSV
@@ -116,12 +114,10 @@ class AudioLoader:
         if embedding.shape[0] < self.fixed_dim:
             # Pad to Fixed Dimension
             embedding = np.pad(
-                embedding,
-                (0, self.fixed_dim - embedding.shape[0]),
-                mode='constant'
+                embedding, (0, self.fixed_dim - embedding.shape[0]), mode="constant"
             ).astype(np.float32)
         elif embedding.shape[0] > self.fixed_dim:
             # Truncate to Fixed Dimension
-            embedding = embedding[:self.fixed_dim]
+            embedding = embedding[: self.fixed_dim]
 
         return embedding

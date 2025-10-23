@@ -32,13 +32,22 @@ class TemporalModel(nn.Module):
 
         # Temporal encoders for each modality
         self.text_encoder = TemporalEncoder(
-            input_dim=text_dim, hidden_dim=hidden_dim, model_type=encoder_type, pooling=pooling
+            input_dim=text_dim,
+            hidden_dim=hidden_dim,
+            model_type=encoder_type,
+            pooling=pooling,
         )
         self.audio_encoder = TemporalEncoder(
-            input_dim=audio_dim, hidden_dim=hidden_dim, model_type=encoder_type, pooling=pooling
+            input_dim=audio_dim,
+            hidden_dim=hidden_dim,
+            model_type=encoder_type,
+            pooling=pooling,
         )
         self.visual_encoder = TemporalEncoder(
-            input_dim=visual_dim, hidden_dim=hidden_dim, model_type=encoder_type, pooling=pooling
+            input_dim=visual_dim,
+            hidden_dim=hidden_dim,
+            model_type=encoder_type,
+            pooling=pooling,
         )
 
         # Fusion module

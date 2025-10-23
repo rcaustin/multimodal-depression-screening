@@ -12,12 +12,12 @@ class Trainer:
     """
 
     def __init__(
-            self,
-            model,
-            batch_size=4,
-            epochs=10,
-            lr=1e-3,
-            modalities=("text", "audio", "visual")
+        self,
+        model,
+        batch_size=4,
+        epochs=10,
+        lr=1e-3,
+        modalities=("text", "audio", "visual"),
     ):
         # Initialize trainer with model, dataset, and training parameters
         self.model = model

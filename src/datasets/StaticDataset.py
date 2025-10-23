@@ -43,7 +43,8 @@ class StaticDataset(Dataset):
 
         # List of Session IDs (Folder Names, Corresponding to Participant_ID in metadata)
         self.session_ids = [
-            str(pid) for pid in self.metadata["Participant_ID"].tolist()
+            str(pid)
+            for pid in self.metadata["Participant_ID"].tolist()
             if os.path.isdir(os.path.join(data_dir, str(pid)))
         ]
 
@@ -69,7 +70,9 @@ class StaticDataset(Dataset):
             features[mod] = loader.load(session_dir)
 
         # Load label
-        matching_rows = self.metadata.loc[self.metadata["Participant_ID"].astype(str) == session_id]
+        matching_rows = self.metadata.loc[
+            self.metadata["Participant_ID"].astype(str) == session_id
+        ]
         if len(matching_rows) == 0:
             raise ValueError(f"No metadata found for session {session_id}")
         row = matching_rows.iloc[0]

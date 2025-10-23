@@ -10,9 +10,7 @@ def test_fusion_output_shape(batch_size, hidden_dim):
     """Check that fusion module returns correct output shape."""
     text_dim, audio_dim, visual_dim = 10, 12, 8
     module = FusionModule(
-        input_dims=[text_dim, audio_dim, visual_dim],
-        hidden_dim=hidden_dim,
-        dropout=0.0
+        input_dims=[text_dim, audio_dim, visual_dim], hidden_dim=hidden_dim, dropout=0.0
     )
 
     # Dummy embeddings

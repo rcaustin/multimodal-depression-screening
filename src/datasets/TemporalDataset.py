@@ -45,17 +45,14 @@ class TemporalDataset(Dataset):
         self.transform = transform
 
         # Hardcoded per-modality max sequence lengths
-        self.max_seq_len = {
-            "text": 152,
-            "audio": 150104,
-            "visual": 45038
-        }
+        self.max_seq_len = {"text": 152, "audio": 150104, "visual": 45038}
 
         self.metadata = pd.read_csv(metadata_path)
 
         # List of Session IDs (Folder Names, Corresponding to Participant_ID in metadata)
         self.session_ids = [
-            str(pid) for pid in self.metadata["Participant_ID"].tolist()
+            str(pid)
+            for pid in self.metadata["Participant_ID"].tolist()
             if os.path.isdir(os.path.join(data_dir, str(pid)))
         ]
 
@@ -92,10 +89,14 @@ class TemporalDataset(Dataset):
             features[mod] = torch.tensor(seq, dtype=torch.float32)
 
         # Load label
-        row = self.metadata.loc[self.metadata["Participant_ID"].astype(str) == session_id]
+        row = self.metadata.loc[
+            self.metadata["Participant_ID"].astype(str) == session_id
+        ]
         if len(row) == 0:
             raise ValueError(f"No metadata found for session {session_id}")
-        label_tensor = torch.tensor(float(row.iloc[0]["PHQ_Binary"]), dtype=torch.float32)
+        label_tensor = torch.tensor(
+            float(row.iloc[0]["PHQ_Binary"]), dtype=torch.float32
+        )
 
         # Optional transform
         if self.transform:

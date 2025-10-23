@@ -56,7 +56,9 @@ class TemporalEncoder(nn.Module):
                 dropout=dropout,
                 batch_first=True,
             )
-            self.encoder = nn.TransformerEncoder(transformer_layer, num_layers=num_layers)
+            self.encoder = nn.TransformerEncoder(
+                transformer_layer, num_layers=num_layers
+            )
 
             # Optional projection if Transformer output dimension differs
             self.output_projection = (

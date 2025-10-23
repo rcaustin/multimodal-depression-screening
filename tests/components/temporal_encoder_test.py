@@ -51,8 +51,9 @@ def test_consistent_output_across_calls():
     first_run = encoder(input_sequence)
     second_run = encoder(input_sequence)
 
-    assert torch.allclose(first_run, second_run, atol=1e-6), \
-        "Outputs differ across identical forward passes"
+    assert torch.allclose(
+        first_run, second_run, atol=1e-6
+    ), "Outputs differ across identical forward passes"
 
 
 @pytest.mark.parametrize("model_type", ["lstm", "transformer"])

@@ -9,15 +9,15 @@ from src.Trainer import Trainer
 
 
 def parse_args():
-    parser = argparse.ArgumentParser(
-        description="Train multimodal depression models"
-    )
+    parser = argparse.ArgumentParser(description="Train multimodal depression models")
     parser.add_argument(
         "mode",
         choices=["static", "temporal"],
-        help=("Choose which model to train: 'static' for "
-              "StaticModel or 'temporal' for "
-              "TemporalModel")
+        help=(
+            "Choose which model to train: 'static' for "
+            "StaticModel or 'temporal' for "
+            "TemporalModel"
+        ),
     )
     return parser.parse_args()
 

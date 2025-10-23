@@ -17,12 +17,10 @@ class VisualLoader:
     """
 
     def __init__(
-            self,
-            feature_file_template=(
-                "{session_id}_OpenFace2.1.0_Pose_gaze_AUs.csv"
-            ),
-            fixed_dim=None,
-            cache=True
+        self,
+        feature_file_template=("{session_id}_OpenFace2.1.0_Pose_gaze_AUs.csv"),
+        fixed_dim=None,
+        cache=True,
     ):
         """
         Args:
@@ -36,9 +34,23 @@ class VisualLoader:
 
         # Action Units to Extract
         self.action_units = [
-            "AU01_r", "AU02_r", "AU04_r", "AU05_r", "AU06_r", "AU07_r",
-            "AU09_r", "AU10_r", "AU12_r", "AU14_r", "AU15_r", "AU17_r",
-            "AU20_r", "AU23_r", "AU25_r", "AU26_r", "AU45_r"
+            "AU01_r",
+            "AU02_r",
+            "AU04_r",
+            "AU05_r",
+            "AU06_r",
+            "AU07_r",
+            "AU09_r",
+            "AU10_r",
+            "AU12_r",
+            "AU14_r",
+            "AU15_r",
+            "AU17_r",
+            "AU20_r",
+            "AU23_r",
+            "AU25_r",
+            "AU26_r",
+            "AU45_r",
         ]
 
         # Fixed Dimension (Number of Action Units)
@@ -62,8 +74,9 @@ class VisualLoader:
 
         # Construct File Path
         csv_path = os.path.join(
-            session_dir, "features",
-            self.feature_file_template.format(session_id=session_id)
+            session_dir,
+            "features",
+            self.feature_file_template.format(session_id=session_id),
         )
 
         # Load CSV
@@ -91,7 +104,7 @@ class VisualLoader:
             # Load DataFrame and Handle Non-Numeric Data Gracefully
             df = (
                 pd.read_csv(csv_path, usecols=self.action_units)
-                .apply(pd.to_numeric, errors='coerce')
+                .apply(pd.to_numeric, errors="coerce")
                 .fillna(0.0)
             )
             return df.to_numpy(dtype=np.float32, copy=False)
@@ -112,7 +125,9 @@ class VisualLoader:
         """
         # Handle Empty Data
         if visual_data.size == 0:
-            logger.warning("[VisualLoader] No visual data found; returning zero embedding")
+            logger.warning(
+                "[VisualLoader] No visual data found; returning zero embedding"
+            )
             return np.zeros(self.fixed_dim, dtype=np.float32)
 
         if visual_data.ndim == 2:
@@ -128,6 +143,6 @@ class VisualLoader:
             embedding = np.pad(embedding, (0, self.fixed_dim - embedding.shape[0]))
         elif embedding.shape[0] > self.fixed_dim:
             # Truncate to Fixed Dimension
-            embedding = embedding[:self.fixed_dim]
+            embedding = embedding[: self.fixed_dim]
 
         return embedding

@@ -57,7 +57,9 @@ class TextLoader:
 
         # Check File Existence; Return Zero Embedding if Missing
         if not os.path.exists(transcript_path_csv):
-            logger.warning(f"[TextLoader] Transcript file missing for session {session_id}")
+            logger.warning(
+                f"[TextLoader] Transcript file missing for session {session_id}"
+            )
             embedding = np.zeros(self.embedding_dim, dtype=np.float32)
             if self.cache:
                 self._cache_dict[session_id] = embedding
