@@ -57,9 +57,16 @@ class TemporalModel(nn.Module):
             pooling=None,
         )
 
-        # Joint temporal encoder after timestep-wise fusion
+        # Learnable gates per modality
+        self.text_gate = nn.Sequential(nn.Linear(hidden_dim, hidden_dim), nn.Sigmoid())
+        self.audio_gate = nn.Sequential(nn.Linear(hidden_dim, hidden_dim), nn.Sigmoid())
+        self.visual_gate = nn.Sequential(
+            nn.Linear(hidden_dim, hidden_dim), nn.Sigmoid()
+        )
+
+        # Joint temporal encoder after gated, timestep-wise fusion
         self.joint_encoder = TemporalEncoder(
-            input_dim=hidden_dim * 3,
+            input_dim=hidden_dim,
             hidden_dim=hidden_dim,
             model_type=encoder_type,
             pooling=pooling,
@@ -87,8 +94,13 @@ class TemporalModel(nn.Module):
         audio_emb = self.audio_encoder(audio_seq)  # [B, T, H]
         visual_emb = self.visual_encoder(visual_seq)  # [B, T, H]
 
-        # Concatenate modalities per timestep
-        fused_seq = torch.cat([text_emb, audio_emb, visual_emb], dim=-1)  # [B, T, 3*H]
+        # Compute gates
+        gT = self.text_gate(text_emb)  # [B, T, H]
+        gA = self.audio_gate(audio_emb)  # [B, T, H]
+        gV = self.visual_gate(visual_emb)  # [B, T, H]
+
+        # Gated fusion per timestep
+        fused_seq = gT * text_emb + gA * audio_emb + gV * visual_emb  # [B, T, H]
 
         # Joint temporal modeling
         fused_emb = self.joint_encoder(fused_seq)  # [B, H] after pooling
