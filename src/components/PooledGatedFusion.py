@@ -33,7 +33,7 @@ class PooledGatedFusion(nn.Module):
         self.layer_norm = nn.LayerNorm(hidden_dim)
         self.dropout = nn.Dropout(dropout)
 
-    def forward(self, *modality_embeddings: torch.Tensor) -> torch.Tensor:
+    def forward(self, *modality_embeddings: torch.Tensor, return_gates: bool = False):
         """
         Forward pass for gated fusion module.
 
@@ -56,4 +56,4 @@ class PooledGatedFusion(nn.Module):
         h = F.relu(self.fusion_layer(fused))
         h = self.layer_norm(h)
         h = self.dropout(h)
-        return h
+        return (h, g) if return_gates else h # Optionally return gate values for analysis
