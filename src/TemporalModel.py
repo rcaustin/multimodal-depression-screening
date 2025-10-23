@@ -1,21 +1,16 @@
+import torch
 import torch.nn as nn
 
-from src.components.FusionModule import FusionModule
 from src.components.TemporalEncoder import TemporalEncoder
 
 
 class TemporalModel(nn.Module):
     """
-    Multimodal model with temporal encoders for each modality and a fusion module.
+    Multimodal model with timestep-wise fusion and joint temporal encoding.
 
-    Args:
-        text_dim (int): Dimension of per-timestep text embeddings.
-        audio_dim (int): Dimension of per-timestep audio features.
-        visual_dim (int): Dimension of per-timestep visual features.
-        hidden_dim (int): Hidden dimension for temporal encoders and fusion.
-        encoder_type (str): 'lstm' or 'transformer'.
-        dropout (float): Dropout probability for fusion module.
-        pooling (str): Pooling strategy for temporal encoder ('mean', 'max', 'last').
+    Each modality is first encoded separately without pooling, then concatenated
+    per timestep. The fused sequence is fed to a joint temporal encoder for final
+    classification.
     """
 
     def __init__(
@@ -27,61 +22,78 @@ class TemporalModel(nn.Module):
         encoder_type: str = "lstm",
         dropout: float = 0.3,
         pooling: str = "mean",
-    ):
+    ) -> None:
+        """
+        Initialize the temporal fusion model.
+
+        Args:
+            text_dim: Dimension of per-timestep text embeddings.
+            audio_dim: Dimension of per-timestep audio features.
+            visual_dim: Dimension of per-timestep visual features.
+            hidden_dim: Hidden dimension for temporal encoders.
+            encoder_type: 'lstm' or 'transformer'.
+            dropout: Dropout probability before output layer.
+            pooling: Pooling strategy for the joint temporal encoder.
+        """
         super().__init__()
 
-        # Temporal encoders for each modality
+        # Per-modality temporal encoders (no pooling)
         self.text_encoder = TemporalEncoder(
             input_dim=text_dim,
             hidden_dim=hidden_dim,
             model_type=encoder_type,
-            pooling=pooling,
+            pooling=None,
         )
         self.audio_encoder = TemporalEncoder(
             input_dim=audio_dim,
             hidden_dim=hidden_dim,
             model_type=encoder_type,
-            pooling=pooling,
+            pooling=None,
         )
         self.visual_encoder = TemporalEncoder(
             input_dim=visual_dim,
             hidden_dim=hidden_dim,
             model_type=encoder_type,
+            pooling=None,
+        )
+
+        # Joint temporal encoder after timestep-wise fusion
+        self.joint_encoder = TemporalEncoder(
+            input_dim=hidden_dim * 3,
+            hidden_dim=hidden_dim,
+            model_type=encoder_type,
             pooling=pooling,
         )
 
-        # Fusion module
-        self.fusion_module = FusionModule(
-            input_dims=[hidden_dim, hidden_dim, hidden_dim],
-            hidden_dim=hidden_dim,
-            dropout=dropout,
-        )
-
-        # Final output layer for binary classification
+        self.dropout = nn.Dropout(dropout)
         self.output_layer = nn.Linear(hidden_dim, 1)
 
-    def forward(self, text_seq, audio_seq, visual_seq):
+    def forward(
+        self, text_seq: torch.Tensor, audio_seq: torch.Tensor, visual_seq: torch.Tensor
+    ) -> torch.Tensor:
         """
-        Forward pass.
+        Forward pass through timestep-aligned temporal fusion.
 
         Args:
-            text_seq (Tensor): [batch_size, seq_len, text_dim]
-            audio_seq (Tensor): [batch_size, seq_len, audio_dim]
-            visual_seq (Tensor): [batch_size, seq_len, visual_dim]
+            text_seq: [batch_size, seq_len, text_dim]
+            audio_seq: [batch_size, seq_len, audio_dim]
+            visual_seq: [batch_size, seq_len, visual_dim]
 
         Returns:
             Tensor: Output logits [batch_size, 1]
         """
+        # Encode each modality (no pooling)
+        text_emb = self.text_encoder(text_seq)  # [B, T, H]
+        audio_emb = self.audio_encoder(audio_seq)  # [B, T, H]
+        visual_emb = self.visual_encoder(visual_seq)  # [B, T, H]
 
-        # Encode each modality temporally
-        text_emb = self.text_encoder(text_seq)
-        audio_emb = self.audio_encoder(audio_seq)
-        visual_emb = self.visual_encoder(visual_seq)
+        # Concatenate modalities per timestep
+        fused_seq = torch.cat([text_emb, audio_emb, visual_emb], dim=-1)  # [B, T, 3*H]
 
-        # Fuse embeddings
-        fused_emb = self.fusion_module(text_emb, audio_emb, visual_emb)
+        # Joint temporal modeling
+        fused_emb = self.joint_encoder(fused_seq)  # [B, H] after pooling
 
-        # Compute final logit
-        output_logit = self.output_layer(fused_emb)
+        fused_emb = self.dropout(fused_emb)
+        output_logit = self.output_layer(fused_emb)  # [B, 1]
 
         return output_logit
