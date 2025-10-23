@@ -4,6 +4,8 @@ from loguru import logger
 from torch.utils.data import DataLoader
 
 from src.datasets.StaticDataset import StaticDataset
+from src.datasets.TemporalDataset import TemporalDataset
+from src.StaticModel import StaticModel
 
 
 class Trainer:
@@ -29,7 +31,10 @@ class Trainer:
         self.model.to(self.device)
 
         # Dataset & dataloader
-        self.dataset = StaticDataset(modalities=self.modalities, cache=True)
+        if isinstance(model, StaticModel):
+            self.dataset = StaticDataset(modalities=self.modalities, cache=True)
+        else:
+            self.dataset = TemporalDataset(modalities=self.modalities, cache=True)
         self.dataloader = DataLoader(
             self.dataset, batch_size=self.batch_size, shuffle=True, num_workers=0
         )
