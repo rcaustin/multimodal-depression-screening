@@ -18,7 +18,7 @@ class TextLoader:
 
     Responsibilities implemented:
     - Single-session load via .load(session_dir) -> torch.FloatTensor [seq_len, feature_dim]
-    - Support precomputed embeddings (*.npy or *.csv) OR on-the-fly transcript embedding (if model_name provided)
+    - Support precomputed embeddings (*.npy or *.csv) OR on-the-fly transcript embedding
     - Optional per-feature z-normalization and temporal downsampling (frame_hop)
     - No padding/truncation here (leave to dataset/collate)
     - Optional in-memory caching keyed by absolute session_dir

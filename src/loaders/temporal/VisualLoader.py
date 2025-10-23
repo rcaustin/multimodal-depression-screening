@@ -1,10 +1,11 @@
 # src/loaders/temporal/VisualLoader.py
 import os
 
-import torch
-import pandas as pd
-import numpy as np
 import loguru as logger
+import numpy as np
+import pandas as pd
+import torch
+
 
 class VisualLoader:
     """
@@ -16,26 +17,37 @@ class VisualLoader:
         - Optionally implement caching to avoid repeated disk reads
     """
 
-    def __init__(self, 
-                 cache=True,
-                 feature_file_template=(
-                "{session_id}_OpenFace2.1.0_Pose_gaze_AUs.csv"
-        ),
-        ):
+    def __init__(
+        self,
+        cache=True,
+        feature_file_template=("{session_id}_OpenFace2.1.0_Pose_gaze_AUs.csv"),
+    ):
         self.cache = cache
         self._cache_store = {}
         self.feature_file_template = feature_file_template
 
         # Action Units to Extract
         self.action_units = [
-            "AU01_r", "AU02_r", "AU04_r", "AU05_r", "AU06_r", "AU07_r",
-            "AU09_r", "AU10_r", "AU12_r", "AU14_r", "AU15_r", "AU17_r",
-            "AU20_r", "AU23_r", "AU25_r", "AU26_r", "AU45_r"
+            "AU01_r",
+            "AU02_r",
+            "AU04_r",
+            "AU05_r",
+            "AU06_r",
+            "AU07_r",
+            "AU09_r",
+            "AU10_r",
+            "AU12_r",
+            "AU14_r",
+            "AU15_r",
+            "AU17_r",
+            "AU20_r",
+            "AU23_r",
+            "AU25_r",
+            "AU26_r",
+            "AU45_r",
         ]
 
         self.F = len(self.action_units)
-
-
 
     def load(self, session_dir: str) -> torch.Tensor:
         """
@@ -55,8 +67,9 @@ class VisualLoader:
 
         # Construct File Path
         csv_path = os.path.join(
-            session_dir, "features",
-            self.feature_file_template.format(session_id=session_id)
+            session_dir,
+            "features",
+            self.feature_file_template.format(session_id=session_id),
         )
 
         # Load CSV
@@ -65,16 +78,15 @@ class VisualLoader:
         # Handle missing/empty: return a single zero frame [1, F]
         if frame_data is None or frame_data.numel() == 0:
             logger.warning(
-                f"[VisualLoader] No visual data for session {session_id}, returning zero tensor."    
+                f"[VisualLoader] No visual data for session {session_id}, returning zero tensor."
             )
             frame_data = torch.zeros((1, self.F), dtype=torch.float32)
-
 
         if self.cache:
             self._cache_dict[session_id] = frame_data
 
         return frame_data
-    
+
     def _load_csv(self, csv_path: str) -> torch.Tensor | None:
         """
         Load visual features from a CSV file.
@@ -89,7 +101,7 @@ class VisualLoader:
             # Load DataFrame and Handle Non-Numeric Data Gracefully
             df = (
                 pd.read_csv(csv_path, usecols=self.action_units)
-                .apply(pd.to_numeric, errors='coerce')
+                .apply(pd.to_numeric, errors="coerce")
                 .fillna(0.0)
             )
             arr = df.to_numpy(dtype=np.float32, copy=False)
