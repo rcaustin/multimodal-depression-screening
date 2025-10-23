@@ -62,7 +62,7 @@ class VisualLoader:
         session_id = os.path.basename(session_dir)
 
         # Check Cache
-        if self.cache and session_id in self._cache_dict:
+        if self.cache and session_id in self._cache_store:
             return self._cache_store[session_id]
 
         # Construct File Path
@@ -83,7 +83,7 @@ class VisualLoader:
             frame_data = torch.zeros((1, self.F), dtype=torch.float32)
 
         if self.cache:
-            self._cache_dict[session_id] = frame_data
+            self._cache_store[session_id] = frame_data
 
         return frame_data
 
