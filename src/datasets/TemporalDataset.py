@@ -2,6 +2,7 @@ import os
 
 import pandas as pd
 import torch
+from loguru import logger
 from torch.utils.data import Dataset
 
 from src.loaders.temporal.AudioLoader import AudioLoader
@@ -12,7 +13,7 @@ from src.utility.alignment import align_to_grid
 
 class TemporalDataset(Dataset):
     """
-    PyTorch Dataset for temporal multimodal depression classification.
+    PyTorch Dataset for temporal multimodal depression classification with caching.
 
     Each modality returns a sequence of embeddings/features:
         - Text: sequence of sentence embeddings per session
@@ -23,6 +24,7 @@ class TemporalDataset(Dataset):
         - Load session metadata
         - Coordinate temporal loaders for each modality
         - Align all modalities to a common temporal grid (e.g., 30Hz)
+        - Cache aligned tensors per session for faster reuse
         - Return tensors of shape [seq_len, feature_dim] per modality
         - Return label as scalar tensor
     """
@@ -40,6 +42,7 @@ class TemporalDataset(Dataset):
         self.modalities = modalities
         self.transform = transform
         self.step_hz = step_hz
+        self.cache = cache
 
         # Load metadata
         self.metadata = pd.read_csv(metadata_path)
@@ -50,9 +53,9 @@ class TemporalDataset(Dataset):
             for pid in self.metadata["Participant_ID"].tolist()
             if os.path.isdir(os.path.join(data_dir, str(pid)))
         ]
-        self.session_ids = ["300", "301"]
+        self.session_ids = ["300", "301"]  # debug override, can remove later
 
-        # Initialize temporal loaders for requested modalities
+        # Initialize temporal loaders
         self.loaders = {}
         if "text" in modalities:
             self.loaders["text"] = TextLoader(cache=cache)
@@ -68,26 +71,47 @@ class TemporalDataset(Dataset):
         session_id = self.session_ids[idx]
         session_dir = os.path.join(self.data_dir, session_id)
 
-        # Load features and timestamps for each modality
-        features_with_ts = {}
-        for mod, loader in self.loaders.items():
-            seq, ts = loader.load(session_dir)  # returns (features, timestamps)
-            features_with_ts[mod] = (seq, ts)
+        cache_dir = os.path.join(session_dir, "aligned_cache")
+        os.makedirs(cache_dir, exist_ok=True)
 
-        # Separate sequences and timestamps for alignment
-        seq_list = [feat for feat, ts in features_with_ts.values()]
-        ts_list = [ts for feat, ts in features_with_ts.values()]
-
-        # Align all modalities to the common temporal grid
-        aligned_features = align_to_grid(
-            modality_list=seq_list, timestamp_list=ts_list, step_hz=self.step_hz
+        # Try loading cached aligned tensors
+        cache_exists = all(
+            os.path.exists(os.path.join(cache_dir, f"{mod}.pt"))
+            for mod in self.loaders.keys()
         )
-        # `aligned_features` is a list in the same order as self.loaders.keys()
 
-        features = {
-            mod: aligned_features[i].detach().clone()
-            for i, mod in enumerate(self.loaders.keys())
-        }
+        if self.cache and cache_exists:
+            features = {
+                mod: torch.load(os.path.join(cache_dir, f"{mod}.pt"))
+                for mod in self.loaders.keys()
+            }
+
+        else:
+            # Load raw features and timestamps
+            logger.info(f"Aligning features for session {session_id}")
+            features_with_ts = {}
+            for mod, loader in self.loaders.items():
+                seq, ts = loader.load(session_dir)
+                features_with_ts[mod] = (seq, ts)
+
+            seq_list = [feat for feat, ts in features_with_ts.values()]
+            ts_list = [ts for feat, ts in features_with_ts.values()]
+
+            # Align to common temporal grid
+            aligned_features = align_to_grid(
+                modality_list=seq_list, timestamp_list=ts_list, step_hz=self.step_hz
+            )
+
+            # Store in dict keyed by modality
+            features = {
+                mod: aligned_features[i].detach().clone()
+                for i, mod in enumerate(self.loaders.keys())
+            }
+
+            # Save aligned tensors for reuse
+            if self.cache:
+                for mod, seq in features.items():
+                    torch.save(seq, os.path.join(cache_dir, f"{mod}.pt"))
 
         # Load label
         row = self.metadata.loc[
