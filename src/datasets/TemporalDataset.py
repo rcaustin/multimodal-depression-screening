@@ -53,7 +53,6 @@ class TemporalDataset(Dataset):
             for pid in self.metadata["Participant_ID"].tolist()
             if os.path.isdir(os.path.join(data_dir, str(pid)))
         ]
-        self.session_ids = ["300", "301"]  # debug override, can remove later
 
         # Initialize temporal loaders
         self.loaders = {}
@@ -88,7 +87,6 @@ class TemporalDataset(Dataset):
 
         else:
             # Load raw features and timestamps
-            logger.info(f"Aligning features for session {session_id}")
             features_with_ts = {}
             for mod, loader in self.loaders.items():
                 seq, ts = loader.load(session_dir)
@@ -109,6 +107,7 @@ class TemporalDataset(Dataset):
             }
 
             # Save aligned tensors for reuse
+            logger.info(f"Caching aligned features for session {session_id}")
             if self.cache:
                 for mod, seq in features.items():
                     torch.save(seq, os.path.join(cache_dir, f"{mod}.pt"))
