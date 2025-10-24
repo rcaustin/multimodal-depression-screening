@@ -47,7 +47,6 @@ class TemporalEncoder(nn.Module):
                 dropout=dropout if num_layers > 1 else 0.0,
                 bidirectional=False,
             )
-
         elif self.model_type == "transformer":
             transformer_layer = nn.TransformerEncoderLayer(
                 d_model=input_dim,
@@ -59,7 +58,7 @@ class TemporalEncoder(nn.Module):
             self.encoder = nn.TransformerEncoder(
                 transformer_layer, num_layers=num_layers
             )
-            # Optional projection if transformer output dimension differs
+            # Project to hidden_dim if needed
             self.output_projection = (
                 nn.Linear(input_dim, hidden_dim)
                 if input_dim != hidden_dim
@@ -93,11 +92,10 @@ class TemporalEncoder(nn.Module):
             raise ValueError(f"Unsupported model_type: {self.model_type}")
 
         if self.pooling is None:
-            # Return the full sequence without pooling
-            normalized_output = self.layer_norm(sequence_outputs)
-            return normalized_output
+            # Return full sequence for timestep-wise fusion
+            return self.layer_norm(sequence_outputs)
 
-        # Standard pooling
+        # Pooling options
         if self.pooling == "last":
             pooled_output = (
                 final_hidden_state[-1]
@@ -111,5 +109,4 @@ class TemporalEncoder(nn.Module):
         else:
             raise ValueError(f"Unsupported pooling type: {self.pooling}")
 
-        normalized_output = self.layer_norm(pooled_output)
-        return normalized_output
+        return self.layer_norm(pooled_output)
