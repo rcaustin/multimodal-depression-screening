@@ -86,7 +86,7 @@ class TemporalDataset(Dataset):
                     pad = torch.zeros((max_len - seq_len, feat_dim))
                     seq = torch.cat([seq, pad], dim=0)
 
-            features[mod] = torch.tensor(seq, dtype=torch.float32)
+            features[mod] = seq.detach().clone()
 
         # Load label
         row = self.metadata.loc[
