@@ -128,7 +128,6 @@ class Trainer:
             },
             save_path,
         )
-        logger.info(f"Checkpoint saved at epoch {epoch} → {save_path}")
 
     def _load_checkpoint_if_available(self):
         """Load model and optimizer state if a checkpoint exists."""
