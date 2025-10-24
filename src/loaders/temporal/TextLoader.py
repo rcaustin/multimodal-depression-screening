@@ -1,118 +1,140 @@
 import os
 import re
 import string
-from typing import Dict, List
+from typing import List, Tuple
 
-import numpy as np
-import pandas as pd
 import torch
+import pandas as pd
 from loguru import logger
 from sentence_transformers import SentenceTransformer
 
 
 class TextLoader:
     """
-    Temporal Text Loader for session transcripts.
+    Temporal loader for session transcripts.
 
     Responsibilities:
-    - Load transcript CSV for a session
-    - Split transcript into sentences / utterances
-    - Encode each sentence into embeddings using SentenceTransformer
-    - Optionally normalize or downsample embeddings
-    - Cache per-session embeddings in memory
+    - Load transcript CSV
+    - Split transcript into sentences/utterances
+    - Encode each sentence into embeddings with SentenceTransformer
+    - Return torch.Tensor [seq_len, feature_dim] and timestamps [seq_len]
     """
 
     def __init__(
         self,
         model_name: str = "all-MPNet-base-v2",
-        embedding_dim: int = 768,
-        cache: bool = True,
         normalize: bool = False,
         frame_hop: int = 1,
+        device: str = "cpu",
+        cache: bool = True,
     ):
-        """
-        Args:
-            model_name: name of the SentenceTransformer model
-            embedding_dim: output embedding dimension
-            cache: whether to cache session embeddings
-            normalize: whether to z-normalize per feature
-            frame_hop: downsample sequence by this stride
-        """
-        self.embedding_dim = embedding_dim
-        self.cache = cache
-        self._cache_dict: Dict[str, np.ndarray] = {}
         self.normalize = normalize
         self.frame_hop = max(1, int(frame_hop))
-        self.model = SentenceTransformer(model_name, device="cpu")
+        self.device = device
+        self.cache = cache
+        self._cache_dict = {}
 
-    def load(self, session_dir: str) -> torch.Tensor:
+        # Load sentence transformer
+        self.model = SentenceTransformer(model_name, device=device)
+        self.embedding_dim = self.model.get_sentence_embedding_dimension()
+
+    def load(self, session_dir: str) -> Tuple[torch.Tensor, torch.Tensor]:
         """
-        Load and embed transcript for a single session.
+        Load and embed transcript for a session.
 
         Returns:
-            torch.Tensor: sequence of embeddings [seq_len, embedding_dim]
+            features: [seq_len, embedding_dim]
+            timestamps: [seq_len]
         """
         session_id = os.path.basename(session_dir)
 
         # Return cached if available
         if self.cache and session_id in self._cache_dict:
-            return torch.from_numpy(self._cache_dict[session_id])
+            return self._cache_dict[session_id]
 
-        transcript_path_csv = os.path.join(session_dir, f"{session_id}_Transcript.csv")
-        if not os.path.exists(transcript_path_csv):
-            logger.warning(f"[TextLoader] Transcript missing for session {session_id}")
-            seq_embeddings = np.zeros((0, self.embedding_dim), dtype=np.float32)
+        transcript_path = os.path.join(session_dir, f"{session_id}_Transcript.csv")
+        if not os.path.exists(transcript_path):
+            logger.warning(
+                f"[TemporalTextLoader] Transcript missing for session {session_id}"
+            )
+            seq_embeddings = torch.zeros((0, self.embedding_dim), dtype=torch.float32)
+            timestamps = torch.zeros(0, dtype=torch.float32)
             if self.cache:
-                self._cache_dict[session_id] = seq_embeddings
-            return torch.from_numpy(seq_embeddings)
+                self._cache_dict[session_id] = (seq_embeddings, timestamps)
+            return seq_embeddings, timestamps
 
-        sentences = self._load_sentences(transcript_path_csv)
+        # Load sentences and timestamps
+        sentences, timestamps = self._load_sentences(transcript_path)
         seq_embeddings = self._embed_sentences(sentences)
 
         # Optional normalization
-        if self.normalize and seq_embeddings.size > 0:
-            mu = seq_embeddings.mean(axis=0, keepdims=True)
-            sigma = seq_embeddings.std(axis=0, keepdims=True) + 1e-8
+        if self.normalize and seq_embeddings.numel() > 0:
+            mu = seq_embeddings.mean(dim=0, keepdim=True)
+            sigma = seq_embeddings.std(dim=0, keepdim=True) + 1e-8
             seq_embeddings = (seq_embeddings - mu) / sigma
 
         # Downsample by frame_hop
-        if self.frame_hop > 1 and seq_embeddings.shape[0] > 0:
+        if self.frame_hop > 1 and seq_embeddings.size(0) > 0:
             seq_embeddings = seq_embeddings[:: self.frame_hop]
+            timestamps = timestamps[:: self.frame_hop]
 
         if self.cache:
-            self._cache_dict[session_id] = seq_embeddings
+            self._cache_dict[session_id] = (seq_embeddings, timestamps)
 
-        return torch.from_numpy(seq_embeddings.astype(np.float32))
+        return seq_embeddings, timestamps
 
-    def _load_sentences(self, transcript_path_csv: str) -> List[str]:
-        """Load text and split into non-empty sentences/utterances."""
+    def _load_sentences(self, transcript_path: str) -> Tuple[List[str], torch.Tensor]:
+        """Load text and timestamps, split into non-empty utterances."""
         try:
-            df = pd.read_csv(transcript_path_csv)
+            df = pd.read_csv(transcript_path)
             text_col = next((c for c in df.columns if "text" in c.lower()), None)
-            if text_col:
+            start_col = next((c for c in df.columns if "start" in c.lower()), None)
+            if text_col and start_col:
                 lines = df[text_col].astype(str).tolist()
+                starts = df[start_col].astype(float).tolist()
             else:
+                # fallback: flatten all columns
                 lines = df.astype(str).values.ravel().tolist()
+                starts = list(range(len(lines)))
         except Exception as e:
-            logger.warning(f"[TextLoader] Failed to read {transcript_path_csv}: {e}")
-            return []
+            logger.warning(
+                f"[TemporalTextLoader] Failed to read {transcript_path}: {e}"
+            )
+            return [], torch.zeros(0, dtype=torch.float32)
 
         # Clean and filter
-        sentences = [self._clean_text(s) for s in lines if s.strip()]
-        return sentences
+        sentences = []
+        timestamps = []
+        for s, t in zip(lines, starts):
+            s_clean = self._clean_text(s)
+            if s_clean.strip():
+                sentences.append(s_clean)
+                timestamps.append(t)
 
-    def _embed_sentences(self, sentences: List[str]) -> np.ndarray:
-        """Encode each sentence with SentenceTransformer."""
+        return sentences, torch.tensor(
+            timestamps, dtype=torch.float32, device=self.device
+        )
+
+    def _embed_sentences(self, sentences: List[str]) -> torch.Tensor:
+        """Convert sentences to embeddings using SentenceTransformer."""
         if not sentences:
-            return np.zeros((0, self.embedding_dim), dtype=np.float32)
+            return torch.zeros(
+                (0, self.embedding_dim), dtype=torch.float32, device=self.device
+            )
 
-        embeddings = self.model.encode(sentences, convert_to_numpy=True)
-        # Ensure shape [num_sentences, embedding_dim]
+        embeddings = self.model.encode(
+            sentences,
+            convert_to_tensor=True,
+            device=self.device,
+            show_progress_bar=False,
+        )
+        # Ensure shape [seq_len, embedding_dim]
         if embeddings.ndim == 1:
-            embeddings = embeddings.reshape(-1, self.embedding_dim)
+            embeddings = embeddings.unsqueeze(0)
         elif embeddings.ndim > 2:
-            embeddings = embeddings.mean(axis=0)
-        return embeddings.astype(np.float32)
+            embeddings = embeddings.mean(dim=0)
+
+        return embeddings.float()
 
     def _clean_text(self, text: str) -> str:
         """Lowercase, remove filler words/punctuation, collapse whitespace."""

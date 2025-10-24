@@ -6,6 +6,7 @@ from torch.utils.data import DataLoader
 from src.datasets.StaticDataset import StaticDataset
 from src.datasets.TemporalDataset import TemporalDataset
 from src.StaticModel import StaticModel
+from src.utility.collation import temporal_collate_fn
 
 
 class Trainer:
@@ -30,13 +31,19 @@ class Trainer:
         self.device = torch.device("cpu")
         self.model.to(self.device)
 
-        # Dataset & dataloader
+        # Dataset
         if isinstance(model, StaticModel):
             self.dataset = StaticDataset(modalities=self.modalities, cache=True)
         else:
             self.dataset = TemporalDataset(modalities=self.modalities, cache=True)
+
+        # Dataloader
         self.dataloader = DataLoader(
-            self.dataset, batch_size=self.batch_size, shuffle=True, num_workers=0
+            self.dataset,
+            batch_size=self.batch_size,
+            shuffle=True,
+            num_workers=0,
+            collate_fn=temporal_collate_fn,
         )
 
         # Loss and optimizer

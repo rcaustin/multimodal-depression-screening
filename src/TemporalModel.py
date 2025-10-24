@@ -8,33 +8,21 @@ class TemporalModel(nn.Module):
     """
     Multimodal model with timestep-wise fusion and joint temporal encoding.
 
-    Each modality is first encoded separately without pooling, then concatenated
-    per timestep. The fused sequence is fed to a joint temporal encoder for final
-    classification.
+    Each modality is first encoded separately without pooling, then fused per
+    timestep using learnable gates. The fused sequence is passed to a joint
+    temporal encoder, which produces a pooled representation for final classification.
     """
 
     def __init__(
         self,
         text_dim: int = 768,
-        audio_dim: int = 88,
+        audio_dim: int = 23,
         visual_dim: int = 17,
         hidden_dim: int = 128,
         encoder_type: str = "lstm",
         dropout: float = 0.3,
         pooling: str = "mean",
     ) -> None:
-        """
-        Initialize the temporal fusion model.
-
-        Args:
-            text_dim: Dimension of per-timestep text embeddings.
-            audio_dim: Dimension of per-timestep audio features.
-            visual_dim: Dimension of per-timestep visual features.
-            hidden_dim: Hidden dimension for temporal encoders.
-            encoder_type: 'lstm' or 'transformer'.
-            dropout: Dropout probability before output layer.
-            pooling: Pooling strategy for the joint temporal encoder.
-        """
         super().__init__()
 
         # Per-modality temporal encoders (no pooling)
@@ -64,7 +52,7 @@ class TemporalModel(nn.Module):
             nn.Linear(hidden_dim, hidden_dim), nn.Sigmoid()
         )
 
-        # Joint temporal encoder after gated, timestep-wise fusion
+        # Joint temporal encoder after gated fusion
         self.joint_encoder = TemporalEncoder(
             input_dim=hidden_dim,
             hidden_dim=hidden_dim,
@@ -79,30 +67,30 @@ class TemporalModel(nn.Module):
         self, text_seq: torch.Tensor, audio_seq: torch.Tensor, visual_seq: torch.Tensor
     ) -> torch.Tensor:
         """
-        Forward pass through timestep-aligned temporal fusion.
+        Forward pass with aligned temporal sequences.
 
         Args:
-            text_seq: [batch_size, seq_len, text_dim]
-            audio_seq: [batch_size, seq_len, audio_dim]
-            visual_seq: [batch_size, seq_len, visual_dim]
+            text_seq: [B, T, text_dim]
+            audio_seq: [B, T, audio_dim]
+            visual_seq: [B, T, visual_dim]
 
         Returns:
-            Tensor: Output logits [batch_size, 1]
+            [B, 1] logits
         """
-        # Encode each modality (no pooling)
+        # Encode each modality (sequence-to-sequence)
         text_emb = self.text_encoder(text_seq)  # [B, T, H]
         audio_emb = self.audio_encoder(audio_seq)  # [B, T, H]
         visual_emb = self.visual_encoder(visual_seq)  # [B, T, H]
 
-        # Compute gates
-        gT = self.text_gate(text_emb)  # [B, T, H]
-        gA = self.audio_gate(audio_emb)  # [B, T, H]
-        gV = self.visual_gate(visual_emb)  # [B, T, H]
+        # Apply learnable gates
+        gT = self.text_gate(text_emb)
+        gA = self.audio_gate(audio_emb)
+        gV = self.visual_gate(visual_emb)
 
-        # Gated fusion per timestep
+        # Gated timestep-wise fusion
         fused_seq = gT * text_emb + gA * audio_emb + gV * visual_emb  # [B, T, H]
 
-        # Joint temporal modeling
+        # Joint temporal modeling (pooled)
         fused_emb = self.joint_encoder(fused_seq)  # [B, H] after pooling
 
         fused_emb = self.dropout(fused_emb)

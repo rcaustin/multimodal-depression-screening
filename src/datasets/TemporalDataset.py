@@ -7,6 +7,7 @@ from torch.utils.data import Dataset
 from src.loaders.temporal.AudioLoader import AudioLoader
 from src.loaders.temporal.TextLoader import TextLoader
 from src.loaders.temporal.VisualLoader import VisualLoader
+from src.utility.alignment import align_to_grid
 
 
 class TemporalDataset(Dataset):
@@ -21,15 +22,9 @@ class TemporalDataset(Dataset):
     Responsibilities:
         - Load session metadata
         - Coordinate temporal loaders for each modality
+        - Align all modalities to a common temporal grid (e.g., 30Hz)
         - Return tensors of shape [seq_len, feature_dim] per modality
         - Return label as scalar tensor
-
-    Max sequence lengths (hardcoded per modality based on 95th percentile):
-        - Text: 152
-        - Audio: 150104
-        - Visual: 45038
-
-    Sequences longer than these lengths are truncated; shorter sequences are zero-padded.
     """
 
     def __init__(
@@ -37,24 +32,25 @@ class TemporalDataset(Dataset):
         data_dir="data/processed/sessions",
         metadata_path="data/processed/metadata_mapped.csv",
         modalities=("text", "audio", "visual"),
+        step_hz=30.0,
         transform=None,
         cache=True,
     ):
         self.data_dir = data_dir
         self.modalities = modalities
         self.transform = transform
+        self.step_hz = step_hz
 
-        # Hardcoded per-modality max sequence lengths
-        self.max_seq_len = {"text": 152, "audio": 150104, "visual": 45038}
-
+        # Load metadata
         self.metadata = pd.read_csv(metadata_path)
 
-        # List of Session IDs (Folder Names, Corresponding to Participant_ID in metadata)
+        # List of Session IDs (folder names)
         self.session_ids = [
             str(pid)
             for pid in self.metadata["Participant_ID"].tolist()
             if os.path.isdir(os.path.join(data_dir, str(pid)))
         ]
+        self.session_ids = ["300", "301"]
 
         # Initialize temporal loaders for requested modalities
         self.loaders = {}
@@ -72,21 +68,26 @@ class TemporalDataset(Dataset):
         session_id = self.session_ids[idx]
         session_dir = os.path.join(self.data_dir, session_id)
 
-        features = {}
+        # Load features and timestamps for each modality
+        features_with_ts = {}
         for mod, loader in self.loaders.items():
-            seq = loader.load(session_dir)  # should return [seq_len, feature_dim]
+            seq, ts = loader.load(session_dir)  # returns (features, timestamps)
+            features_with_ts[mod] = (seq, ts)
 
-            # Truncation/padding per modality
-            if mod in self.max_seq_len:
-                max_len = self.max_seq_len[mod]
-                seq_len, feat_dim = seq.shape
-                if seq_len > max_len:
-                    seq = seq[:max_len]
-                elif seq_len < max_len:
-                    pad = torch.zeros((max_len - seq_len, feat_dim))
-                    seq = torch.cat([seq, pad], dim=0)
+        # Separate sequences and timestamps for alignment
+        seq_list = [feat for feat, ts in features_with_ts.values()]
+        ts_list = [ts for feat, ts in features_with_ts.values()]
 
-            features[mod] = seq.detach().clone()
+        # Align all modalities to the common temporal grid
+        aligned_features = align_to_grid(
+            modality_list=seq_list, timestamp_list=ts_list, step_hz=self.step_hz
+        )
+        # `aligned_features` is a list in the same order as self.loaders.keys()
+
+        features = {
+            mod: aligned_features[i].detach().clone()
+            for i, mod in enumerate(self.loaders.keys())
+        }
 
         # Load label
         row = self.metadata.loc[
