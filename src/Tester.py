@@ -1,19 +1,21 @@
 from typing import Dict
+
 import torch
-from torch.utils.data import DataLoader
-from tqdm import tqdm
 from loguru import logger
 from sklearn.metrics import (
     accuracy_score,
     precision_recall_fscore_support,
     roc_auc_score,
 )
+from torch.utils.data import DataLoader
+from tqdm import tqdm
 
 from src.datasets.StaticDataset import StaticDataset
 from src.datasets.TemporalDataset import TemporalDataset
-from src.utility.collation import temporal_collate_fn
 from src.StaticModel import StaticModel
 from src.TemporalModel import TemporalModel
+from src.utility.collation import temporal_collate_fn
+from src.utility.splitting import patient_level_split
 
 
 class Tester:
@@ -32,9 +34,10 @@ class Tester:
         device (str): Device to run evaluation on ('cpu' or 'cuda')
     """
 
-    def __init__(self, model: torch.nn.Module, device: str = "cpu"):
-        self.device = device
+    def __init__(self, model: torch.nn.Module, test_fraction: float = 0.2):
+        self.device: str = "cpu"
         self.model = model.to(self.device)
+        self.test_fraction = test_fraction
 
         # Determine Checkpoint Path
         if isinstance(model, StaticModel):
@@ -130,16 +133,17 @@ class Tester:
         self.model.load_state_dict(checkpoint["model_state_dict"])
 
     def _prepare_dataset_and_loader(self):
-        # Set Dataset Paths
-        data_dir = "data/processed/sessions"
-        metadata_path = "data/processed/metadata_mapped.csv"
-        caching = True
+        # Split Dataset By Patient
+        _, test_sessions = patient_level_split()
 
-        # Initialize Dataset And DataLoader
+        # Initialize Test Dataset
         if isinstance(self.model, StaticModel):
-            self.test_dataset = StaticDataset(
-                data_dir=data_dir, metadata_path=metadata_path, cache=caching
-            )
+            self.test_dataset = StaticDataset(test_sessions)
+        else:
+            self.test_dataset = TemporalDataset(test_sessions)
+
+        # Initialize Test DataLoader
+        if isinstance(self.model, StaticModel):
             self.test_loader = DataLoader(
                 self.test_dataset,
                 batch_size=4,
@@ -147,9 +151,6 @@ class Tester:
                 shuffle=False,
             )
         else:
-            self.test_dataset = TemporalDataset(
-                data_dir=data_dir, metadata_path=metadata_path, cache=caching
-            )
             self.test_loader = DataLoader(
                 self.test_dataset,
                 batch_size=4,

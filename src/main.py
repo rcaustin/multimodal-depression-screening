@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 import argparse
-from pprint import pprint
+import pprint
 
 from loguru import logger
 
@@ -8,6 +8,7 @@ from src.StaticModel import StaticModel
 from src.TemporalModel import TemporalModel
 from src.Tester import Tester
 from src.Trainer import Trainer
+from src.utility.splitting import patient_level_split
 
 
 def parse_args():
@@ -44,6 +45,12 @@ def main():
 
     # Initialize Model
     model = StaticModel() if args.model == "static" else TemporalModel()
+
+    # Compute Patient-Level Split
+    train_sessions, test_sessions = patient_level_split()
+    logger.info(
+        f"Patient-Level Split Train/Test Split: {len(train_sessions)} / {len(test_sessions)}"
+    )
 
     # Training Branch
     if args.operation == "train":
