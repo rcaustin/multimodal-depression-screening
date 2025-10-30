@@ -19,7 +19,7 @@ def temporal_collate_fn(batch):
     collated = {}
 
     # Process modalities
-    for k in ['text', 'audio', 'visual']:
+    for k in ["text", "audio", "visual"]:
         max_len = max(b[k].shape[0] for b in batch)
         feat_dim = batch[0][k].shape[1]
 
@@ -30,9 +30,9 @@ def temporal_collate_fn(batch):
         collated[k] = padded
 
     # Stack labels
-    collated['label'] = torch.stack([b['label'] for b in batch])
+    collated["label"] = torch.stack([b["label"] for b in batch])
 
     # Keep session IDs as a list (or convert to tensor if needed)
-    collated['session'] = [b['session'] for b in batch]
+    collated["session"] = [b["session"] for b in batch]
 
     return collated
