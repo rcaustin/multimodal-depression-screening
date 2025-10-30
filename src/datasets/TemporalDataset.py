@@ -31,6 +31,7 @@ class TemporalDataset(Dataset):
 
     def __init__(
         self,
+        sessions,
         data_dir="data/processed/sessions",
         metadata_path="data/processed/metadata_mapped.csv",
         modalities=("text", "audio", "visual"),
@@ -38,23 +39,15 @@ class TemporalDataset(Dataset):
         transform=None,
         cache=True,
     ):
+        self.session_ids = sessions
         self.data_dir = data_dir
         self.modalities = modalities
         self.transform = transform
         self.step_hz = step_hz
         self.cache = cache
-
-        # Load metadata
         self.metadata = pd.read_csv(metadata_path)
 
-        # List of Session IDs (folder names)
-        self.session_ids = [
-            str(pid)
-            for pid in self.metadata["Participant_ID"].tolist()
-            if os.path.isdir(os.path.join(data_dir, str(pid)))
-        ]
-
-        # Initialize temporal loaders
+        # Initialize Temporal Loaders
         self.loaders = {}
         if "text" in modalities:
             self.loaders["text"] = TextLoader(cache=cache)
@@ -126,4 +119,8 @@ class TemporalDataset(Dataset):
         if self.transform:
             features = self.transform(features)
 
-        return {**features, "label": label_tensor}
+        return {
+            **features,
+            "label": label_tensor,
+            "session": self.metadata["Participant_ID"].iloc[idx],
+        }
