@@ -1,8 +1,11 @@
 from typing import Dict
 
 import torch
-from sklearn.metrics import (accuracy_score, precision_recall_fscore_support,
-                             roc_auc_score)
+from sklearn.metrics import (
+    accuracy_score,
+    precision_recall_fscore_support,
+    roc_auc_score,
+)
 from torch.utils.data import DataLoader
 from tqdm import tqdm
 

@@ -88,15 +88,11 @@ def main():
         caching = True
         if isinstance(model, StaticModel):
             test_dataset = StaticDataset(
-                data_dir=data_dir,
-                metadata_path=metadata_path,
-                cache=caching
+                data_dir=data_dir, metadata_path=metadata_path, cache=caching
             )
         else:
             test_dataset = TemporalDataset(
-                data_dir=data_dir,
-                metadata_path=metadata_path,
-                cache=caching
+                data_dir=data_dir, metadata_path=metadata_path, cache=caching
             )
 
         # Prepare Dataloader
@@ -105,7 +101,7 @@ def main():
                 test_dataset,
                 batch_size=args.batch_size,
                 num_workers=0,  # Avoid Shared Memory Issues by Using Single Worker
-                shuffle=False
+                shuffle=False,
             )
         else:
             test_loader = DataLoader(
@@ -113,7 +109,7 @@ def main():
                 batch_size=args.batch_size,
                 num_workers=0,  # Avoid Shared Memory Issues by Using Single Worker
                 shuffle=False,
-                collate_fn=temporal_collate_fn
+                collate_fn=temporal_collate_fn,
             )
 
         # Run Evaluation using Tester
