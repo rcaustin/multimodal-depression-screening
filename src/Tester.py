@@ -1,91 +1,115 @@
 from typing import Dict
-
 import torch
+from torch.utils.data import DataLoader
+from tqdm import tqdm
+from loguru import logger
 from sklearn.metrics import (
     accuracy_score,
     precision_recall_fscore_support,
     roc_auc_score,
 )
-from torch.utils.data import DataLoader
-from tqdm import tqdm
+
+from src.datasets.StaticDataset import StaticDataset
+from src.datasets.TemporalDataset import TemporalDataset
+from src.utility.collation import temporal_collate_fn
+from src.StaticModel import StaticModel
+from src.TemporalModel import TemporalModel
 
 
 class Tester:
     """
-    Utility class for evaluating a trained multimodal model on a test dataset.
+    Evaluates a trained multimodal model on a test dataset.
 
-    Handles batching, device placement, evaluation metrics, and logging of results.
+    Handles:
+        - Checkpoint loading
+        - Dataset and DataLoader preparation
+        - Device placement
+        - Loss computation
+        - Standard binary classification metrics
 
     Args:
-        model (torch.nn.Module): Trained model to evaluate.
-        test_loader (DataLoader): DataLoader providing test samples.
-        device (str): Device to run evaluation on ('cpu' or 'cuda').
-        metrics (dict[str, callable], optional): Dict of metric functions, each accepting
-            (preds, targets) and returning a scalar.
+        model (torch.nn.Module): Model to evaluate
+        device (str): Device to run evaluation on ('cpu' or 'cuda')
     """
 
-    def __init__(
-        self,
-        model: torch.nn.Module,
-        test_loader: DataLoader,
-        device: str = "cpu",
-        metrics: Dict[str, callable] | None = None,
-    ):
-        self.model = model.to(device)
-        self.test_loader = test_loader
+    def __init__(self, model: torch.nn.Module, device: str = "cpu"):
         self.device = device
-        self.metrics = metrics or {}
+        self.model = model.to(self.device)
 
+        # Determine Checkpoint Path
+        if isinstance(model, StaticModel):
+            self.checkpoint_path = "models/static_model.pt"
+        elif isinstance(model, TemporalModel):
+            self.checkpoint_path = "models/temporal_model.pt"
+        else:
+            raise ValueError(f"Unknown Model Type: {type(model)}")
+
+        # Load Checkpoint
+        self._load_checkpoint()
+
+        # Prepare Dataset And Dataloader
+        self._prepare_dataset_and_loader()
+
+        # Loss Function
         self.criterion = torch.nn.BCEWithLogitsLoss()
 
     @torch.no_grad()
-    def evaluate(self):
+    def evaluate(self) -> Dict:
+        # Set Model To Evaluation Mode
         self.model.eval()
-        all_outputs = []
-        all_targets = []
+        all_outputs, all_targets = [], []
         total_loss = 0.0
 
+        # Iterate Over Test Batches
         for batch in tqdm(self.test_loader, desc="[ModelTester] Evaluating"):
-            # Move Modalities to Device
-            text_seq = batch["text"].to(self.device)
-            audio_seq = batch["audio"].to(self.device)
-            visual_seq = batch["visual"].to(self.device)
+            # Move Data To Device
+            if isinstance(self.model, TemporalModel):
+                text_seq = batch["text"].to(self.device)
+                audio_seq = batch["audio"].to(self.device)
+                visual_seq = batch["visual"].to(self.device)
+                outputs = self.model(text_seq, audio_seq, visual_seq)
+            else:
+                # StaticModel
+                features = batch["features"].to(self.device)
+                outputs = self.model(features)
 
+            # Prepare Targets
             targets = batch["label"].to(self.device)
             if targets.ndim == 1:
-                targets = targets.unsqueeze(1)  # [B, 1]
-
-            outputs = self.model(text_seq, audio_seq, visual_seq)
+                targets = targets.unsqueeze(1)
 
             # Compute Loss
             loss = self.criterion(outputs, targets)
             total_loss += loss.item() * targets.size(0)
 
+            # Collect Outputs And Targets
             all_outputs.append(outputs.cpu())
             all_targets.append(targets.cpu())
 
         # Concatenate All Batches
-        all_outputs = torch.cat(all_outputs, dim=0).squeeze()  # [N]
-        all_targets = torch.cat(all_targets, dim=0).squeeze()  # [N]
+        all_outputs = torch.cat(all_outputs, dim=0).squeeze()
+        all_targets = torch.cat(all_targets, dim=0).squeeze()
 
-        avg_loss = total_loss / len(self.test_loader.dataset)
+        # Compute Average Loss
+        avg_loss = total_loss / len(self.test_dataset)
 
-        # Convert Logits to Probabilities
+        # Convert Logits To Probabilities
         probs = torch.sigmoid(all_outputs)
 
-        # Binary Predictions (Threshold 0.5)
+        # Generate Binary Predictions With Threshold 0.5
         preds = (probs >= 0.5).long()
 
         # Compute Standard Metrics
         accuracy = accuracy_score(all_targets, preds)
         precision, recall, f1, _ = precision_recall_fscore_support(
-            all_targets, preds, average="binary"
+            all_targets, preds, average="binary", zero_division=0
         )
         try:
             roc_auc = roc_auc_score(all_targets, probs)
         except ValueError:
             roc_auc = float("nan")  # Not Enough Positive/Negative Samples
 
+        # Aggregate Results
         results = {
             "loss": avg_loss,
             "accuracy": accuracy,
@@ -98,3 +122,38 @@ class Tester:
         }
 
         return results
+
+    def _load_checkpoint(self):
+        # Log Checkpoint Loading
+        logger.info(f"Loading Checkpoint From {self.checkpoint_path}")
+        checkpoint = torch.load(self.checkpoint_path, map_location=self.device)
+        self.model.load_state_dict(checkpoint["model_state_dict"])
+
+    def _prepare_dataset_and_loader(self):
+        # Set Dataset Paths
+        data_dir = "data/processed/sessions"
+        metadata_path = "data/processed/metadata_mapped.csv"
+        caching = True
+
+        # Initialize Dataset And DataLoader
+        if isinstance(self.model, StaticModel):
+            self.test_dataset = StaticDataset(
+                data_dir=data_dir, metadata_path=metadata_path, cache=caching
+            )
+            self.test_loader = DataLoader(
+                self.test_dataset,
+                batch_size=4,
+                num_workers=0,
+                shuffle=False,
+            )
+        else:
+            self.test_dataset = TemporalDataset(
+                data_dir=data_dir, metadata_path=metadata_path, cache=caching
+            )
+            self.test_loader = DataLoader(
+                self.test_dataset,
+                batch_size=4,
+                num_workers=0,
+                shuffle=False,
+                collate_fn=temporal_collate_fn,
+            )
