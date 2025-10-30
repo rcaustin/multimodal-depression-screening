@@ -72,9 +72,18 @@ class Tester:
                 visual_seq = batch["visual"].to(self.device)
                 outputs = self.model(text_seq, audio_seq, visual_seq)
             else:
-                # StaticModel
-                features = batch["features"].to(self.device)
-                outputs = self.model(features)
+                text = batch.get("text")
+                audio = batch.get("audio")
+                visual = batch.get("visual")
+
+                if text is not None:
+                    text = text.to(self.device)
+                if audio is not None:
+                    audio = audio.to(self.device)
+                if visual is not None:
+                    visual = visual.to(self.device)
+
+                outputs = self.model(text, audio, visual)
 
             # Prepare Targets
             targets = batch["label"].to(self.device)
