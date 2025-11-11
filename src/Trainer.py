@@ -10,6 +10,7 @@ from src.datasets.StaticDataset import StaticDataset
 from src.datasets.TemporalDataset import TemporalDataset
 from src.StaticModel import StaticModel
 from src.utility.collation import temporal_collate_fn
+from src.utility.splitting import patient_level_split
 
 
 class Trainer:
@@ -26,40 +27,44 @@ class Trainer:
         modalities=("text", "audio", "visual"),
         save_dir="models",
     ):
-        self.model = model
         self.batch_size = batch_size
         self.epochs = epochs
         self.lr = lr
         self.modalities = modalities
         self.device = torch.device("cpu")
-        self.model.to(self.device)
+        self.model = model.to(self.device)
 
-        # Create save directory
+        # Create Save Directory
         os.makedirs(save_dir, exist_ok=True)
         self.save_dir = save_dir
 
-        # Determine model type
-        if isinstance(model, StaticModel):
-            self.dataset = StaticDataset(modalities=self.modalities, cache=True)
-            self.model_name = "static_model.pt"
-        else:
-            self.dataset = TemporalDataset(modalities=self.modalities, cache=True)
-            self.model_name = "temporal_model.pt"
+        # Apply Patient-Level Split
+        train_sessions, _ = patient_level_split()
 
-        # Dataloader
+        # Determine Model Type and Initialize Dataset
+        if isinstance(model, StaticModel):
+            train_dataset = StaticDataset(train_sessions)
+            self.model_name = "static_model.pt"
+            collate_fn = None  # Default Collate for Static Dataset
+        else:
+            train_dataset = TemporalDataset(train_sessions)
+            self.model_name = "temporal_model.pt"
+            collate_fn = temporal_collate_fn  # Use Custom Temporal Collate
+
+        # Initialize DataLoader
         self.dataloader = DataLoader(
-            self.dataset,
+            train_dataset,
             batch_size=self.batch_size,
             shuffle=True,
             num_workers=0,
-            collate_fn=temporal_collate_fn,
+            collate_fn=collate_fn,
         )
 
-        # Loss and optimizer
+        # Loss and Optimizer
         self.criterion = nn.BCEWithLogitsLoss()
         self.optimizer = torch.optim.Adam(self.model.parameters(), lr=self.lr)
 
-        # Check for existing checkpoint
+        # Check for Existing Checkpoint
         self.start_epoch = 0
         self._load_checkpoint_if_available()
 
@@ -69,13 +74,13 @@ class Trainer:
         self.model.train()
 
         for epoch in range(self.start_epoch, self.epochs):
-            start_time = time.perf_counter()  # ⏱️ Start timer
+            start_time = time.perf_counter()  # Start Timer
             epoch_loss = 0.0
 
             for batch in self.dataloader:
                 self.optimizer.zero_grad()
 
-                # Move features to device
+                # Move Features To Device
                 text = batch.get("text")
                 audio = batch.get("audio")
                 visual = batch.get("visual")
@@ -89,18 +94,18 @@ class Trainer:
                 if visual is not None:
                     visual = visual.to(self.device)
 
-                # Forward pass
+                # Forward Pass
                 output = self.model(text, audio, visual).view(-1)
                 loss = self.criterion(output, label)
 
-                # Backward pass
+                # Backward Pass
                 loss.backward()
                 self.optimizer.step()
                 epoch_loss += loss.item()
 
-            # Compute average loss and elapsed time
+            # Compute Average Loss and Elapsed Time
             avg_loss = epoch_loss / len(self.dataloader)
-            elapsed = time.perf_counter() - start_time  # seconds
+            elapsed = time.perf_counter() - start_time  # Seconds
 
             logger.info(
                 f"Epoch {epoch+1}/{self.epochs}, "
@@ -108,10 +113,10 @@ class Trainer:
                 f"Time: {elapsed:.2f}s"
             )
 
-            # Save checkpoint each epoch
+            # Save Checkpoint Each Epoch
             self._save_checkpoint(epoch + 1)
 
-        logger.info("Training complete.")
+        logger.info("Training Complete.")
 
     def _checkpoint_path(self):
         return os.path.join(self.save_dir, self.model_name)

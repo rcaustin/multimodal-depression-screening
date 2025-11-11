@@ -21,6 +21,7 @@ class StaticDataset(Dataset):
 
     def __init__(
         self,
+        sessions,
         data_dir="data/processed/sessions",
         metadata_path="data/processed/metadata_mapped.csv",
         modalities=("text", "audio", "visual"),
@@ -35,18 +36,11 @@ class StaticDataset(Dataset):
             transform: Optional transform applied to features
             cache: Whether to cache features in memory
         """
+        self.session_ids = sessions
         self.data_dir = data_dir
         self.modalities = modalities
         self.transform = transform
-
         self.metadata = pd.read_csv(metadata_path)
-
-        # List of Session IDs (Folder Names, Corresponding to Participant_ID in metadata)
-        self.session_ids = [
-            str(pid)
-            for pid in self.metadata["Participant_ID"].tolist()
-            if os.path.isdir(os.path.join(data_dir, str(pid)))
-        ]
 
         # Initialize modality loaders
         self.loaders = {}
@@ -87,4 +81,8 @@ class StaticDataset(Dataset):
             features[mod] = torch.tensor(features[mod], dtype=torch.float32)
         label_tensor = torch.tensor(label, dtype=torch.float32)
 
-        return {**features, "label": label_tensor}
+        return {
+            **features,
+            "label": label_tensor,
+            "session": self.metadata["Participant_ID"].iloc[idx],
+        }
