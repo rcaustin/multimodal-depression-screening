@@ -12,7 +12,7 @@ TARGET_DIR="./data/raw/EDAIC"
 # Create target directory if it doesn't exist
 mkdir -p "$TARGET_DIR"
 
-# Use wget to download files recursively
-wget -r -np -nH --cut-dirs=1 -P "$TARGET_DIR" "$URL"
+# Use wget to download files recursively, resuming partial downloads
+wget -c -r -np -nH --cut-dirs=1 -P "$TARGET_DIR" "$URL"
 
 echo "Download complete. Files saved in $TARGET_DIR"
