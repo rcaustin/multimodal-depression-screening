@@ -41,15 +41,6 @@ for archive in "$SRC_DIR"/*_P.tar.gz; do
     fi
 
     echo "Successfully extracted $filename"
-
-    # Keep only the three files we need
-    transcript_file="$session_dest/${session_id}_Transcript.csv"
-    features_dir="$session_dest/features"
-
-    # Delete everything except the three desired files
-    find "$session_dest" -mindepth 1 ! -path "$transcript_file" ! -path "$features_dir/${session_id}_OpenFace2.1.0_Pose_gaze_AUs.csv" ! -path "$features_dir/${session_id}_OpenSMILE2.3.0_egemaps.csv" -exec rm -rf {} +
-
-    echo "Cleaned up unnecessary files for session $session_id"
 done
 
 echo "Complete."
