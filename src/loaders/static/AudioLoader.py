@@ -19,7 +19,7 @@ class AudioLoader:
 
     def __init__(
         self,
-        feature_file_template: str = ("{session_id}_BoAW_openSMILE_2.3.0_eGeMAPS.csv"),
+        feature_file_template: str = ("{session_id}_OpenSMILE2.3.0_egemaps.csv"),
         fixed_dim: int = 88,
         cache: bool = True,
     ):
