@@ -24,8 +24,8 @@ def parse_args():
 
     parser.add_argument(
         "model",
-        choices=["static", "temporal"],
-        help="Model type to use: 'static' or 'temporal'",
+        choices=["static", "temporal", "DANN"],
+        help="Model type to use: 'static', 'temporal', or 'DANN'",
     )
 
     parser.add_argument(
@@ -54,7 +54,7 @@ def main():
 
     # Training Branch
     if args.operation == "train":
-        trainer = Trainer(model)
+        trainer = Trainer(model, use_dann=(args.model == "DANN"))
         trainer.run()
 
     # Testing Branch

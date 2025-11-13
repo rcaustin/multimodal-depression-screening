@@ -29,7 +29,7 @@ class Trainer:
         lr=1e-3,
         modalities=("text", "audio", "visual"),
         save_dir="models",
-        use_dann= True,    # Whether to use Domain-Adversarial Neural Network (DANN)
+        use_dann= False,    # Whether to use Domain-Adversarial Neural Network (DANN)
         dann_lambda=0.1,    # Weight for domain adversary loss
         dann_alpha=1.0      # Gradient reversal scaling factor
     ):
