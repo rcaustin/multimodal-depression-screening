@@ -32,6 +32,10 @@ def temporal_collate_fn(batch):
     # Stack labels
     collated["label"] = torch.stack([b["label"] for b in batch])
 
+    # Stack gender if present
+    if "gender" in batch[0]:
+        collated["gender"] = torch.stack([b["gender"] for b in batch])
+
     # Keep session IDs as a list (or convert to tensor if needed)
     collated["session"] = [b["session"] for b in batch]
 
