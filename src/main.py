@@ -52,15 +52,17 @@ def main():
         f"Patient-Level Split Train/Test Split: {len(train_sessions)} / {len(test_sessions)}"
     )
 
+    use_dann = args.model == "DANN"
+
     # Training Branch
     if args.operation == "train":
-        trainer = Trainer(model, use_dann=(args.model == "DANN"))
+        trainer = Trainer(model, use_dann=use_dann)
         trainer.run()
 
     # Testing Branch
     elif args.operation == "test":
         try:
-            tester = Tester(model)
+            tester = Tester(model, use_dann=use_dann)
             results = tester.evaluate()
             logger.info("Test Results:")
             pprint(
