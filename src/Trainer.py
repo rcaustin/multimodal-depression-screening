@@ -113,6 +113,7 @@ class Trainer:
         for epoch in range(self.start_epoch, self.epochs):
             start_time = time.perf_counter()  # Start Timer
             epoch_loss = 0.0
+            epoch_domain_loss = 0.0
 
             for batch in self.dataloader:
                 self.optimizer.zero_grad()
@@ -154,25 +155,30 @@ class Trainer:
 
                     # Total loss
                     loss = task_loss + self.dann_lambda * domain_loss
+
+                    epoch_loss += loss.item()
+                    epoch_domain_loss += domain_loss.item()
                 
                 # === Standard path ===
                 else:
                     output = self.model(text, audio, visual).view(-1)
                     loss = self.criterion(output, label)
+                    epoch_loss += loss.item()
 
                 # Backward Pass
                 loss.backward()
                 self.optimizer.step()
-                epoch_loss += loss.item()
 
             # Compute Average Loss and Elapsed Time
             avg_loss = epoch_loss / len(self.dataloader)
+            avg_domain_loss = epoch_domain_loss / len(self.dataloader) if self.use_dann else 0.0
             elapsed = time.perf_counter() - start_time  # Seconds
 
             logger.info(
                 f"Epoch {epoch+1}/{self.epochs}, "
                 f"Loss: {avg_loss:.4f}, "
-                f"Time: {elapsed:.2f}s"
+                f"Domain Loss: {avg_domain_loss:.4f}, "
+                f"Time: {elapsed:.2f}s"  
             )
 
             # Save Checkpoint Each Epoch
