@@ -10,7 +10,7 @@ from src.datasets.StaticDataset import StaticDataset
 from src.datasets.TemporalDataset import TemporalDataset
 from src.StaticModel import StaticModel
 from src.utility.collation import temporal_collate_fn
-from src.utility.splitting import patient_level_split
+from src.utility.splitting import stratified_patient_split
 
 from src.utility.grl import grad_reverse
 from src.components.DomainAdversary import DANN
@@ -50,7 +50,7 @@ class Trainer:
         self.dann_alpha = dann_alpha
 
         # Apply Patient-Level Split
-        train_sessions, _ = patient_level_split()
+        train_sessions, _ = stratified_patient_split()
 
         # Determine Model Type and Initialize Dataset
         if isinstance(model, StaticModel):

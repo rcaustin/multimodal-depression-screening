@@ -2,11 +2,8 @@ from typing import Dict
 
 import torch
 from loguru import logger
-from sklearn.metrics import (
-    accuracy_score,
-    precision_recall_fscore_support,
-    roc_auc_score,
-)
+from sklearn.metrics import (accuracy_score, precision_recall_fscore_support,
+                             roc_auc_score)
 from torch.utils.data import DataLoader
 from tqdm import tqdm
 
@@ -15,7 +12,7 @@ from src.datasets.TemporalDataset import TemporalDataset
 from src.StaticModel import StaticModel
 from src.TemporalModel import TemporalModel
 from src.utility.collation import temporal_collate_fn
-from src.utility.splitting import patient_level_split
+from src.utility.splitting import stratified_patient_split
 
 
 class Tester:
@@ -147,7 +144,7 @@ class Tester:
 
     def _prepare_dataset_and_loader(self):
         # Split Dataset By Patient
-        _, test_sessions = patient_level_split()
+        _, test_sessions = stratified_patient_split()
 
         # Initialize Test Dataset
         if isinstance(self.model, StaticModel):
