@@ -25,7 +25,7 @@ class _GRL(Function):
         """
         ctx.alpha = alpha
         return x.view_as(x)
-    
+
     @staticmethod
     def backward(ctx, grad_output):
         """
@@ -38,7 +38,8 @@ class _GRL(Function):
         """
         # multiply the incoming gradient by -alpha
         return -ctx.alpha * grad_output, None
-    
+
+
 def grad_reverse(x, alpha: float = 1.0):
     """
     Apply Gradient Reversal Layer to input tensor x with scaling factor alpha.

@@ -29,9 +29,9 @@ class Trainer:
         lr=1e-3,
         modalities=("text", "audio", "visual"),
         save_dir="models",
-        use_dann= False,    # Whether to use Domain-Adversarial Neural Network (DANN)
-        dann_lambda=0.1,    # Weight for domain adversary loss
-        dann_alpha=1.0      # Gradient reversal scaling factor
+        use_dann=False,  # Whether to use Domain-Adversarial Neural Network (DANN)
+        dann_lambda=0.1,  # Weight for domain adversary loss
+        dann_alpha=1.0,  # Gradient reversal scaling factor
     ):
         self.batch_size = batch_size
         self.epochs = epochs
@@ -78,8 +78,12 @@ class Trainer:
         self.domain_adversary = None
         self.domain_criterion = None
 
-        if self.use_dann and not isinstance(model, StaticModel): # DANN only for Temporal Models
-            feature_dim = getattr(self.model, 'hidden_dim', 128)  # Uses the hidden_dim from model as input size
+        if self.use_dann and not isinstance(
+            model, StaticModel
+        ):  # DANN only for Temporal Models
+            feature_dim = getattr(
+                self.model, "hidden_dim", 128
+            )  # Uses the hidden_dim from model as input size
 
             # Domain adversary head
             self.domain_adversary = DANN(input_dim=feature_dim).to(self.device)
@@ -87,8 +91,9 @@ class Trainer:
 
             # Joint optimizer for model and domain adversary
             self.optimizer = torch.optim.Adam(
-                list(self.model.parameters()) + list(self.domain_adversary.parameters()),
-                lr=self.lr
+                list(self.model.parameters())
+                + list(self.domain_adversary.parameters()),
+                lr=self.lr,
             )
         else:
             # Original optimizer for model only
@@ -140,7 +145,9 @@ class Trainer:
                 # === DANN path ===
                 if self.use_dann and self.domain_adversary is not None:
                     # Get the logits and features from the model
-                    output, features = self.model(text, audio, visual, return_features=True)
+                    output, features = self.model(
+                        text, audio, visual, return_features=True
+                    )
                     output = output.view(-1)
 
                     # Main task loss
@@ -158,7 +165,7 @@ class Trainer:
 
                     epoch_loss += loss.item()
                     epoch_domain_loss += domain_loss.item()
-                
+
                 # === Standard path ===
                 else:
                     output = self.model(text, audio, visual).view(-1)
@@ -171,14 +178,16 @@ class Trainer:
 
             # Compute Average Loss and Elapsed Time
             avg_loss = epoch_loss / len(self.dataloader)
-            avg_domain_loss = epoch_domain_loss / len(self.dataloader) if self.use_dann else 0.0
+            avg_domain_loss = (
+                epoch_domain_loss / len(self.dataloader) if self.use_dann else 0.0
+            )
             elapsed = time.perf_counter() - start_time  # Seconds
 
             logger.info(
                 f"Epoch {epoch+1}/{self.epochs}, "
                 f"Loss: {avg_loss:.4f}, "
                 f"Domain Loss: {avg_domain_loss:.4f}, "
-                f"Time: {elapsed:.2f}s"  
+                f"Time: {elapsed:.2f}s"
             )
 
             # Save Checkpoint Each Epoch
@@ -188,10 +197,10 @@ class Trainer:
 
     def _checkpoint_path(self):
 
-        if self.use_dann: # Save DANN models separately
+        if self.use_dann:  # Save DANN models separately
             base, ext = os.path.splitext(self.model_name)
             return os.path.join(self.save_dir, f"{base}_dann{ext}")
-        
+
         return os.path.join(self.save_dir, self.model_name)
 
     def _save_checkpoint(self, epoch):
@@ -209,11 +218,11 @@ class Trainer:
         }
 
         if self.domain_adversary is not None:
-            checkpoint["domain_adversary_state_dict"] = self.domain_adversary.state_dict()
+            checkpoint["domain_adversary_state_dict"] = (
+                self.domain_adversary.state_dict()
+            )
 
-        torch.save(
-            checkpoint, save_path
-        )
+        torch.save(checkpoint, save_path)
 
     def _load_checkpoint_if_available(self):
         """Load model and optimizer state if a checkpoint exists."""

@@ -21,8 +21,7 @@ def stratified_patient_split(
 
     # Combined Stratification Label
     metadata["Stratum"] = (
-        metadata["PHQ_Binary"].astype(str) + "_" +
-        metadata["Gender"].astype(str)
+        metadata["PHQ_Binary"].astype(str) + "_" + metadata["Gender"].astype(str)
     )
 
     X = metadata["Participant_ID"].astype(str)
@@ -52,6 +51,7 @@ def stratified_patient_split(
             logger.info(f"  {stratum}: {count} ({pct:.1f}%)")
 
         return counts
+
     train_meta = metadata[metadata["Participant_ID"].astype(str).isin(train_sessions)]
     test_meta = metadata[metadata["Participant_ID"].astype(str).isin(test_sessions)]
     counts_train = log_distribution(train_meta, "Train")

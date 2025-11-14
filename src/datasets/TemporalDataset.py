@@ -116,17 +116,19 @@ class TemporalDataset(Dataset):
         )
 
         # Load gender for use with DANN
-        g_raw = str(row.iloc[0]["Gender"]).strip().lower() # expects 'male' or 'female'
+        g_raw = str(row.iloc[0]["Gender"]).strip().lower()  # expects 'male' or 'female'
         if g_raw == "male":
             gender = 0.0
         elif g_raw == "female":
             gender = 1.0
         else:
-            logger.warning(f"Unknown gender '{g_raw}' for session {session_id}, default to 0")
+            logger.warning(
+                f"Unknown gender '{g_raw}' for session {session_id}, default to 0"
+            )
             gender = 0.0
 
         gender_tensor = torch.tensor(gender, dtype=torch.float32)
-        
+
         # Optional transform
         if self.transform:
             features = self.transform(features)

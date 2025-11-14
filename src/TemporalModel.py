@@ -64,7 +64,11 @@ class TemporalModel(nn.Module):
         self.output_layer = nn.Linear(hidden_dim, 1)
 
     def forward(
-        self, text_seq: torch.Tensor, audio_seq: torch.Tensor, visual_seq: torch.Tensor, return_features: bool = False
+        self,
+        text_seq: torch.Tensor,
+        audio_seq: torch.Tensor,
+        visual_seq: torch.Tensor,
+        return_features: bool = False,
     ) -> torch.Tensor:
         """
         Forward pass with aligned temporal sequences.

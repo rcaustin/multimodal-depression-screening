@@ -12,6 +12,7 @@ Gradient reversal layer forces the shared feature extractor to remove
 gender-specific information from the learned representation.
 """
 
+
 class DANN(nn.Module):
     def __init__(self, input_dim: int = 128, hidden_dim: int = 128):
         """
@@ -23,13 +24,13 @@ class DANN(nn.Module):
         self.adversary = nn.Sequential(
             nn.Linear(input_dim, hidden_dim),
             nn.ReLU(inplace=True),
-            nn.Linear(hidden_dim, 1)
+            nn.Linear(hidden_dim, 1),
         )
 
     def forward(self, features):
         """
         Forward pass of the domain adversary.
-        
+
         Inputs:
             features: input feature tensor of shape [B, input_dim]
 

@@ -2,8 +2,11 @@ from typing import Dict
 
 import torch
 from loguru import logger
-from sklearn.metrics import (accuracy_score, precision_recall_fscore_support,
-                             roc_auc_score)
+from sklearn.metrics import (
+    accuracy_score,
+    precision_recall_fscore_support,
+    roc_auc_score,
+)
 from torch.utils.data import DataLoader
 from tqdm import tqdm
 
@@ -31,7 +34,9 @@ class Tester:
         device (str): Device to run evaluation on ('cpu' or 'cuda')
     """
 
-    def __init__(self, model: torch.nn.Module, test_fraction: float = 0.2, use_dann: bool = False):
+    def __init__(
+        self, model: torch.nn.Module, test_fraction: float = 0.2, use_dann: bool = False
+    ):
         self.device: str = "cpu"
         self.model = model.to(self.device)
         self.use_dann = use_dann
