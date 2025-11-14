@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
 import os
-
 import pandas as pd
 
 # Paths
@@ -11,6 +10,7 @@ METADATA_PATH = "data/processed/metadata_mapped.csv"
 def main():
     # Load metadata
     metadata = pd.read_csv(METADATA_PATH)
+    participant_ids = set(metadata["Participant_ID"].astype(str))
     total_participants = len(metadata)
     total_sessions = len(metadata)
     print(f"Total participants in metadata: {total_participants}")
@@ -19,14 +19,13 @@ def main():
     usable_sessions = []
     omitted_sessions = []
 
-    for _, row in metadata.iterrows():
-        participant_id = str(row["Participant_ID"])
-        session_dir = os.path.join(DATA_DIR, participant_id)
-
+    # Check which sessions exist in metadata
+    for pid in participant_ids:
+        session_dir = os.path.join(DATA_DIR, pid)
         if os.path.isdir(session_dir):
-            usable_sessions.append(participant_id)
+            usable_sessions.append(pid)
         else:
-            omitted_sessions.append((participant_id, "Missing session folder"))
+            omitted_sessions.append((pid, "Missing session folder"))
 
     print(f"Usable sessions: {len(usable_sessions)}\n")
 
@@ -36,6 +35,17 @@ def main():
             print(f"  {pid}: {reason}")
     else:
         print("No sessions were omitted.")
+
+    # Check for extra sessions in DATA_DIR not in metadata
+    data_dir_sessions = set(os.listdir(DATA_DIR))
+    extra_sessions = data_dir_sessions - participant_ids
+
+    if extra_sessions:
+        print("\nSessions in data directory not in metadata:")
+        for pid in sorted(extra_sessions):
+            print(f"  {pid}")
+    else:
+        print("\nNo extra sessions found in data directory.")
 
 
 if __name__ == "__main__":
