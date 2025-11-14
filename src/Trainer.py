@@ -10,7 +10,7 @@ from src.datasets.StaticDataset import StaticDataset
 from src.datasets.TemporalDataset import TemporalDataset
 from src.StaticModel import StaticModel
 from src.utility.collation import temporal_collate_fn
-from src.utility.splitting import patient_level_split
+from src.utility.splitting import stratified_patient_split
 
 
 class Trainer:
@@ -39,7 +39,7 @@ class Trainer:
         self.save_dir = save_dir
 
         # Apply Patient-Level Split
-        train_sessions, _ = patient_level_split()
+        train_sessions, _ = stratified_patient_split()
 
         # Determine Model Type and Initialize Dataset
         if isinstance(model, StaticModel):
