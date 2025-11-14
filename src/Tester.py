@@ -37,7 +37,7 @@ class Tester:
     def __init__(
         self, model: torch.nn.Module, test_fraction: float = 0.2, use_dann: bool = False
     ):
-        self.device: str = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        self.device: str = "cpu"
         self.model = model.to(self.device)
         self.use_dann = use_dann
         self.test_fraction = test_fraction
