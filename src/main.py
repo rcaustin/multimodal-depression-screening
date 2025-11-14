@@ -42,6 +42,8 @@ def main():
     logger.info(f"Operation: {args.operation}")
     logger.info(f"Model: {args.model}")
 
+    use_dann = args.model == "DANN"
+
     # Initialize Model
     model = StaticModel() if args.model == "static" else TemporalModel()
 
