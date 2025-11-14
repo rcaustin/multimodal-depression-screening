@@ -37,7 +37,7 @@ class Trainer:
         self.epochs = epochs
         self.lr = lr
         self.modalities = modalities
-        self.device = torch.device("cpu")
+        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         self.model = model.to(self.device)
 
         # Create Save Directory
