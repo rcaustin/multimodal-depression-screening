@@ -12,6 +12,9 @@ from src.StaticModel import StaticModel
 from src.utility.collation import temporal_collate_fn
 from src.utility.splitting import stratified_patient_split
 
+from src.utility.grl import grad_reverse
+from src.components.DomainAdversary import DANN
+
 
 class Trainer:
     """
@@ -26,6 +29,9 @@ class Trainer:
         lr=1e-3,
         modalities=("text", "audio", "visual"),
         save_dir="models",
+        use_dann= False,    # Whether to use Domain-Adversarial Neural Network (DANN)
+        dann_lambda=0.1,    # Weight for domain adversary loss
+        dann_alpha=1.0      # Gradient reversal scaling factor
     ):
         self.batch_size = batch_size
         self.epochs = epochs
@@ -37,6 +43,11 @@ class Trainer:
         # Create Save Directory
         os.makedirs(save_dir, exist_ok=True)
         self.save_dir = save_dir
+
+        # DANN flags
+        self.use_dann = use_dann
+        self.dann_lambda = dann_lambda
+        self.dann_alpha = dann_alpha
 
         # Apply Patient-Level Split
         train_sessions, _ = stratified_patient_split()
@@ -60,9 +71,28 @@ class Trainer:
             collate_fn=collate_fn,
         )
 
-        # Loss and Optimizer
+        # Task loss
         self.criterion = nn.BCEWithLogitsLoss()
-        self.optimizer = torch.optim.Adam(self.model.parameters(), lr=self.lr)
+
+        # Setup DANN if enabled
+        self.domain_adversary = None
+        self.domain_criterion = None
+
+        if self.use_dann and not isinstance(model, StaticModel): # DANN only for Temporal Models
+            feature_dim = getattr(self.model, 'hidden_dim', 128)  # Uses the hidden_dim from model as input size
+
+            # Domain adversary head
+            self.domain_adversary = DANN(input_dim=feature_dim).to(self.device)
+            self.domain_criterion = nn.BCEWithLogitsLoss()
+
+            # Joint optimizer for model and domain adversary
+            self.optimizer = torch.optim.Adam(
+                list(self.model.parameters()) + list(self.domain_adversary.parameters()),
+                lr=self.lr
+            )
+        else:
+            # Original optimizer for model only
+            self.optimizer = torch.optim.Adam(self.model.parameters(), lr=self.lr)
 
         # Check for Existing Checkpoint
         self.start_epoch = 0
@@ -71,11 +101,19 @@ class Trainer:
     def run(self):
         """Run the full training loop with checkpointing and timing."""
         logger.info(f"Training model: {type(self.model).__name__}")
+        if self.use_dann and self.domain_adversary is not None:
+            logger.info(
+                f"DANN enabled with lambda={self.dann_lambda}, alpha={self.dann_alpha}"
+            )
+
         self.model.train()
+        if self.domain_adversary is not None:
+            self.domain_adversary.train()
 
         for epoch in range(self.start_epoch, self.epochs):
             start_time = time.perf_counter()  # Start Timer
             epoch_loss = 0.0
+            epoch_domain_loss = 0.0
 
             for batch in self.dataloader:
                 self.optimizer.zero_grad()
@@ -94,23 +132,53 @@ class Trainer:
                 if visual is not None:
                     visual = visual.to(self.device)
 
-                # Forward Pass
-                output = self.model(text, audio, visual).view(-1)
-                loss = self.criterion(output, label)
+                # Get gender labels for DANN if available
+                gender = batch.get("gender")
+                if gender is not None:
+                    gender = gender.float().to(self.device).view(-1)
+
+                # === DANN path ===
+                if self.use_dann and self.domain_adversary is not None:
+                    # Get the logits and features from the model
+                    output, features = self.model(text, audio, visual, return_features=True)
+                    output = output.view(-1)
+
+                    # Main task loss
+                    task_loss = self.criterion(output, label)
+
+                    # Apply Gradient Reversal Layer before domain adversary
+                    reversed_features = grad_reverse(features, alpha=self.dann_alpha)
+                    dlogits = self.domain_adversary(reversed_features).view(-1)
+
+                    # Domain adversary loss
+                    domain_loss = self.domain_criterion(dlogits, gender)
+
+                    # Total loss
+                    loss = task_loss + self.dann_lambda * domain_loss
+
+                    epoch_loss += loss.item()
+                    epoch_domain_loss += domain_loss.item()
+                
+                # === Standard path ===
+                else:
+                    output = self.model(text, audio, visual).view(-1)
+                    loss = self.criterion(output, label)
+                    epoch_loss += loss.item()
 
                 # Backward Pass
                 loss.backward()
                 self.optimizer.step()
-                epoch_loss += loss.item()
 
             # Compute Average Loss and Elapsed Time
             avg_loss = epoch_loss / len(self.dataloader)
+            avg_domain_loss = epoch_domain_loss / len(self.dataloader) if self.use_dann else 0.0
             elapsed = time.perf_counter() - start_time  # Seconds
 
             logger.info(
                 f"Epoch {epoch+1}/{self.epochs}, "
                 f"Loss: {avg_loss:.4f}, "
-                f"Time: {elapsed:.2f}s"
+                f"Domain Loss: {avg_domain_loss:.4f}, "
+                f"Time: {elapsed:.2f}s"  
             )
 
             # Save Checkpoint Each Epoch
@@ -119,19 +187,32 @@ class Trainer:
         logger.info("Training Complete.")
 
     def _checkpoint_path(self):
+
+        if self.use_dann: # Save DANN models separately
+            base, ext = os.path.splitext(self.model_name)
+            return os.path.join(self.save_dir, f"{base}_dann{ext}")
+        
         return os.path.join(self.save_dir, self.model_name)
 
     def _save_checkpoint(self, epoch):
         """Save model and optimizer state."""
         save_path = self._checkpoint_path()
+
+        checkpoint = {
+            "model_state_dict": self.model.state_dict(),
+            "optimizer_state_dict": self.optimizer.state_dict(),
+            "epochs_trained": epoch,
+            "modalities": self.modalities,
+            "use_dann": self.use_dann,
+            "dann_lambda": self.dann_lambda,
+            "dann_alpha": self.dann_alpha,
+        }
+
+        if self.domain_adversary is not None:
+            checkpoint["domain_adversary_state_dict"] = self.domain_adversary.state_dict()
+
         torch.save(
-            {
-                "model_state_dict": self.model.state_dict(),
-                "optimizer_state_dict": self.optimizer.state_dict(),
-                "epochs_trained": epoch,
-                "modalities": self.modalities,
-            },
-            save_path,
+            checkpoint, save_path
         )
 
     def _load_checkpoint_if_available(self):
@@ -140,6 +221,14 @@ class Trainer:
         if os.path.exists(load_path):
             checkpoint = torch.load(load_path, map_location=self.device)
             self.model.load_state_dict(checkpoint["model_state_dict"])
+
+            # Restore DANN if applicable
+            if self.use_dann and "domain_adversary_state_dict" in checkpoint:
+                if self.domain_adversary is not None:
+                    self.domain_adversary.load_state_dict(
+                        checkpoint["domain_adversary_state_dict"]
+                    )
+
             self.optimizer.load_state_dict(checkpoint["optimizer_state_dict"])
             self.start_epoch = checkpoint.get("epochs_trained", 0)
             logger.info(

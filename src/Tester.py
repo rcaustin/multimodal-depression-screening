@@ -31,16 +31,20 @@ class Tester:
         device (str): Device to run evaluation on ('cpu' or 'cuda')
     """
 
-    def __init__(self, model: torch.nn.Module, test_fraction: float = 0.2):
+    def __init__(self, model: torch.nn.Module, test_fraction: float = 0.2, use_dann: bool = False):
         self.device: str = "cpu"
         self.model = model.to(self.device)
+        self.use_dann = use_dann
         self.test_fraction = test_fraction
 
         # Determine Checkpoint Path
         if isinstance(model, StaticModel):
             self.checkpoint_path = "models/static_model.pt"
         elif isinstance(model, TemporalModel):
-            self.checkpoint_path = "models/temporal_model.pt"
+            if self.use_dann:
+                self.checkpoint_path = "models/temporal_model_dann.pt"
+            else:
+                self.checkpoint_path = "models/temporal_model.pt"
         else:
             raise ValueError(f"Unknown Model Type: {type(model)}")
 
