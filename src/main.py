@@ -8,7 +8,6 @@ from src.StaticModel import StaticModel
 from src.TemporalModel import TemporalModel
 from src.Tester import Tester
 from src.Trainer import Trainer
-from src.utility.splitting import stratified_patient_split
 
 
 def parse_args():
@@ -45,12 +44,6 @@ def main():
 
     # Initialize Model
     model = StaticModel() if args.model == "static" else TemporalModel()
-
-    # Compute Patient-Level Split
-    train_sessions, test_sessions = stratified_patient_split()
-    logger.info(
-        f"Patient-Level Split Train/Test Split: {len(train_sessions)} / {len(test_sessions)}"
-    )
 
     # Training Branch
     if args.operation == "train":
