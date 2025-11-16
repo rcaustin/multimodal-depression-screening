@@ -24,9 +24,9 @@ class Trainer:
     def __init__(
         self,
         model,
-        batch_size=4,
-        epochs=10,
-        lr=1e-3,
+        batch_size=8,
+        epochs=50,
+        lr=1e-4,
         modalities=("text", "audio", "visual"),
         save_dir="models",
         use_dann=False,  # Whether to use Domain-Adversarial Neural Network (DANN)

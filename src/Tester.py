@@ -35,10 +35,14 @@ class Tester:
     """
 
     def __init__(
-        self, model: torch.nn.Module, test_fraction: float = 0.2, use_dann: bool = False
+        self, model: torch.nn.Module,
+        test_fraction: float = 0.2,
+        batch_size: int = 8,
+        use_dann: bool = False
     ):
         self.device: str = "cpu"
         self.model = model.to(self.device)
+        self.batch_size = batch_size
         self.use_dann = use_dann
         self.test_fraction = test_fraction
 
@@ -161,14 +165,14 @@ class Tester:
         if isinstance(self.model, StaticModel):
             self.test_loader = DataLoader(
                 self.test_dataset,
-                batch_size=4,
+                batch_size=self.batch_size,
                 num_workers=0,
                 shuffle=False,
             )
         else:
             self.test_loader = DataLoader(
                 self.test_dataset,
-                batch_size=4,
+                batch_size=self.batch_size,
                 num_workers=0,
                 shuffle=False,
                 collate_fn=temporal_collate_fn,

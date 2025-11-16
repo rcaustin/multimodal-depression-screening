@@ -42,20 +42,23 @@ def main():
     logger.info(f"Operation: {args.operation}")
     logger.info(f"Model: {args.model}")
 
-    use_dann = args.model == "DANN"
+    BATCH_SIZE = 8
+    EPOCHS = 50
+    LR = 1e-4
+    USE_DANN = args.model == "DANN"
 
     # Initialize Model
     model = StaticModel() if args.model == "static" else TemporalModel()
 
     # Training Branch
     if args.operation == "train":
-        trainer = Trainer(model, use_dann=use_dann)
+        trainer = Trainer(model, batch_size=BATCH_SIZE, epochs=EPOCHS, lr=LR, use_dann=USE_DANN)
         trainer.run()
 
     # Testing Branch
     elif args.operation == "test":
         try:
-            tester = Tester(model, use_dann=use_dann)
+            tester = Tester(model, batch_size=BATCH_SIZE, use_dann=USE_DANN)
             results = tester.evaluate()
             logger.info("Test Results:")
             pprint(
