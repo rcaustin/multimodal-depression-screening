@@ -37,8 +37,12 @@ class Trainer:
         self.epochs = epochs
         self.lr = lr
         self.modalities = modalities
-        self.device = "cpu"
+        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         self.model = model.to(self.device)
+        
+        # ---- CUDA SPEEDUP OPTION ----
+        if self.device.type == "cuda":
+            torch.backends.cudnn.benchmark = True
 
         # Create Save Directory
         os.makedirs(save_dir, exist_ok=True)

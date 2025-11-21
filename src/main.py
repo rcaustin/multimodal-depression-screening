@@ -42,7 +42,7 @@ def main():
     logger.info(f"Operation: {args.operation}")
     logger.info(f"Model: {args.model}")
 
-    BATCH_SIZE = 8
+    BATCH_SIZE = 1
     EPOCHS = 50
     LR = 1e-4
     USE_DANN = args.model == "DANN"
