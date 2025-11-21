@@ -229,23 +229,23 @@ class Trainer:
         torch.save(checkpoint, save_path)
 
     def _load_checkpoint_if_available(self):
-        """Load model and optimizer state if a checkpoint exists."""
+        """
+        Always start fresh — ignore any existing checkpoints.
+
+        This is important when:
+          • you add new sessions
+          • you change data splits
+          • you change model code
+        Otherwise PyTorch will resume old training.
+        """
         load_path = self._checkpoint_path()
+
         if os.path.exists(load_path):
-            checkpoint = torch.load(load_path, map_location=self.device)
-            self.model.load_state_dict(checkpoint["model_state_dict"])
-
-            # Restore DANN if applicable
-            if self.use_dann and "domain_adversary_state_dict" in checkpoint:
-                if self.domain_adversary is not None:
-                    self.domain_adversary.load_state_dict(
-                        checkpoint["domain_adversary_state_dict"]
-                    )
-
-            self.optimizer.load_state_dict(checkpoint["optimizer_state_dict"])
-            self.start_epoch = checkpoint.get("epochs_trained", 0)
             logger.info(
-                f"Resumed training from checkpoint at epoch {self.start_epoch} ({load_path})"
+                f"Ignoring existing checkpoint at {load_path} — starting a fresh run."
             )
         else:
             logger.info("No existing checkpoint found — starting fresh.")
+
+        # Force training to begin from scratch
+        self.start_epoch = 0
