@@ -38,6 +38,8 @@ class TemporalDataset(Dataset):
         step_hz=30.0,
         transform=None,
         cache=True,
+        chunk_len = None,
+        chunk_hop = None
     ):
         self.session_ids = sessions
         self.data_dir = data_dir
@@ -56,28 +58,38 @@ class TemporalDataset(Dataset):
         if "visual" in modalities:
             self.loaders["visual"] = VisualLoader(cache=cache)
 
-    def __len__(self):
-        return len(self.session_ids)
+        # Chunking configuration
+        self.chunk_len = chunk_len
+        if self.chunk_len is not None:
+            self.chunk_hop = chunk_hop or chunk_len
+        else:
+            self.chunk_hop = None
 
-    def __getitem__(self, idx):
-        session_id = self.session_ids[idx]
+        # Build index over sessions. chunks: list of (session_id, start)
+        self.index = self._build_index()
+
+    # Internal helpers for chunking
+    def _load_aligned_features(self, session_id):
+        """
+        Load aligned features for a single session, using caching when available.
+
+        Returns:
+            dict: {modality_name: tensor [T, D]}
+        """
         session_dir = os.path.join(self.data_dir, session_id)
-
         cache_dir = os.path.join(session_dir, "aligned_cache")
         os.makedirs(cache_dir, exist_ok=True)
 
         # Try loading cached aligned tensors
-        cache_exists = all(
-            os.path.exists(os.path.join(cache_dir, f"{mod}.pt"))
-            for mod in self.loaders.keys()
-        )
+        cache_paths = {
+            mod: os.path.join(cache_dir, f"{mod}.pt") for mod in self.loaders.keys()
+        }
+        cache_exists = all(os.path.exists(path) for path in cache_paths.values())
 
         if self.cache and cache_exists:
             features = {
-                mod: torch.load(os.path.join(cache_dir, f"{mod}.pt"))
-                for mod in self.loaders.keys()
+                mod: torch.load(path) for mod, path in cache_paths.items()
             }
-
         else:
             # Load raw features and timestamps
             features_with_ts = {}
@@ -103,39 +115,93 @@ class TemporalDataset(Dataset):
             logger.info(f"Caching aligned features for session {session_id}")
             if self.cache:
                 for mod, seq in features.items():
-                    torch.save(seq, os.path.join(cache_dir, f"{mod}.pt"))
+                    torch.save(seq, cache_paths[mod])
+        
+        return features
 
-        # Load label
-        row = self.metadata.loc[
-            self.metadata["Participant_ID"].astype(str) == session_id
-        ]
-        if len(row) == 0:
-            raise ValueError(f"No metadata found for session {session_id}")
-        label_tensor = torch.tensor(
-            float(row.iloc[0]["PHQ_Binary"]), dtype=torch.float32
-        )
 
-        # Load gender for use with DANN
-        g_raw = str(row.iloc[0]["Gender"]).strip().lower()  # expects 'male' or 'female'
-        if g_raw == "male":
-            gender = 0.0
-        elif g_raw == "female":
-            gender = 1.0
-        else:
-            logger.warning(
-                f"Unknown gender '{g_raw}' for session {session_id}, default to 0"
-            )
-            gender = 0.0
+    def _build_index(self):
+        """
+        Build an index of sessions (session_id, start) pairs.
+        
+        In full session mode (chunk_len = None), there is exactly one entry per session with start = None.
+        In chunked mode, sliding windows of length chunk_len and hop chunk_hop are created.
+        """
 
-        gender_tensor = torch.tensor(gender, dtype=torch.float32)
+        index = []
+
+        if self.chunk_len is None:
+            # One item per session, original behaviour
+            for sid in self.session_ids:
+                index.append((sid, None))
+            return index
+        
+        # Chunked mode: build chunks for each session
+        for sid in self.session_ids:
+            features = self._load_aligned_features(sid)
+            # Use first modality's length as T (all modalities aligned)
+            first_mod = next(iter(features.keys()))
+            T = features[first_mod].shape[0]
+
+            start = 0
+            while start + self.chunk_len <= T:
+                index.append((sid, start))
+                start += self.chunk_hop # Final tail chunk is dropped to eliminate padding requirement
+
+        return index
+    
+    # Dataset interface
+    def __len__(self):
+        return len(self.index) # In full session mode, len == number of sessions
+
+    def __getitem__(self, idx):
+        # Resolve session / chunk
+        session_id, start = self.index[idx]
+
+        # Load aligned features for session
+        features = self._load_aligned_features(session_id)
+
+        # In in chunking mode, slice the features to [chunk_len, D]
+        if self.chunk_len is not None and start is not None:
+            end = start + self.chunk_len
+            features = {
+                mod: seq[start:end]
+                for mod, seq in features.items()
+            }
 
         # Optional transform
         if self.transform:
             features = self.transform(features)
 
-        return {
+        # Load label + gender from metadata using session_id
+        row = self.metadata.loc[
+            self.metadata["Participant_ID"].astype(str) == session_id
+        ]
+        if len(row) == 0:
+            raise ValueError(f"No metadata found for session {session_id}")
+        
+        label_tensor = torch.tensor(row.iloc[0]["PHQ8_Binary"], dtype=torch.float32)
+
+        g_raw = str(row.iloc[0]["Gender"]).strip().lower() # expects 'male' or 'female'
+        if g_raw == "male":
+            gender = 0.0
+        elif g_raw == "female":
+            gender = 1.0
+        else:
+            logger.warning(f"Unknown gender '{g_raw}' for session {session_id}, defaulting to 0.0")
+            gender = 0.0
+
+        gender_tensor = torch.tensor(gender, dtype=torch.float32)
+
+        sample = {
             **features,
             "label": label_tensor,
             "gender": gender_tensor,
-            "session": self.metadata["Participant_ID"].iloc[idx],
+            "session": session_id,
         }
+
+        # For testing aggregation, also return start index
+        if self.chunk_len is not None:
+            sample["start"] = start
+
+        return sample        
