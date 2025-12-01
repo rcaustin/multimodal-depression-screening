@@ -14,7 +14,7 @@ from src.datasets.StaticDataset import StaticDataset
 from src.datasets.TemporalDataset import TemporalDataset
 from src.StaticModel import StaticModel
 from src.TemporalModel import TemporalModel
-from src.utility.collation import temporal_collate_fn
+from src.utility.collation import temporal_collate_fn, chunked_temporal_collate_fn
 from src.utility.splitting import stratified_patient_split
 
 
@@ -38,13 +38,17 @@ class Tester:
         self, model: torch.nn.Module,
         test_fraction: float = 0.2,
         batch_size: int = 8,
-        use_dann: bool = False
+        use_dann: bool = False,
+        chunk_len: int | None = None,
+        chunk_hop: int | None = None
     ):
         self.device: str = "cpu"
         self.model = model.to(self.device)
         self.batch_size = batch_size
         self.use_dann = use_dann
         self.test_fraction = test_fraction
+        self.chunk_len = chunk_len
+        self.chunk_hop = chunk_hop
 
         # Determine Checkpoint Path
         if isinstance(model, StaticModel):
@@ -70,8 +74,17 @@ class Tester:
     def evaluate(self) -> Dict:
         # Set Model To Evaluation Mode
         self.model.eval()
-        all_outputs, all_targets = [], []
+        
         total_loss = 0.0
+
+        # Detect whether we're evaluating on chunked temporal dataset
+        chunked = isinstance(self.model, TemporalModel) and hasattr(self.test_dataset, 'chunk_len') and self.test_dataset.chunk_len is not None
+
+        if not chunked:
+            all_outputs, all_targets = [], []
+        else:
+            session_logits: Dict[str, list[float]] = {}
+            session_targets: Dict[str, int] = {}
 
         # Iterate Over Test Batches
         for batch in tqdm(self.test_loader, desc="[ModelTester] Evaluating"):
@@ -105,15 +118,53 @@ class Tester:
             total_loss += loss.item() * targets.size(0)
 
             # Collect Outputs And Targets
-            all_outputs.append(outputs.cpu())
-            all_targets.append(targets.cpu())
+            if not chunked:
+                all_outputs.append(outputs.cpu())
+                all_targets.append(targets.cpu())
+            else: # Chunked mode
+                # Aggregate logits per session
+                sessions = batch["session"]  # List of session IDs
+                logits = outputs.detach().cpu().view(-1)  # [B]
+                targs = targets.detach().cpu().view(-1)  # [B]
 
-        # Concatenate All Batches
-        all_outputs = torch.cat(all_outputs, dim=0).squeeze()
-        all_targets = torch.cat(all_targets, dim=0).squeeze()
+                for sid, logit, targ in zip(sessions, logits, targs):
+                    sid = str(sid)
+                    if sid not in session_logits:
+                        session_logits[sid] = []
+                    session_logits[sid].append(float(logit))
 
-        # Compute Average Loss
-        avg_loss = total_loss / len(self.test_dataset)
+                    # Store the session-level label
+                    targ_int = int(targ.item())
+                    if sid in session_targets:
+                        # Safety check, make sure labels match
+                        if session_targets[sid] != targ_int:
+                            logger.warning(f"Conflicting labels for session {sid}, {session_targets[sid]} vs {targ_int}")
+                    session_targets[sid] = targ_int
+
+        # Concatenate All Batches or Aggregate Chunked Results
+        if not chunked:
+            all_outputs = torch.cat(all_outputs, dim=0).squeeze()
+            all_targets = torch.cat(all_targets, dim=0).squeeze()
+        
+            # Compute Average Loss
+            avg_loss = total_loss / len(self.test_dataset)
+        
+        else:
+            # Build per-session outputs/targets
+            session_ids = sorted(session_logits.keys())
+            agg_outputs, agg_targets = [], []
+
+            for sid in session_ids:
+                logs = session_logits[sid]
+                # Mean logit over all chunks for this session
+                mean_logit = sum(logs) / len(logs)
+                agg_outputs.append(mean_logit)
+                agg_targets.append(session_targets[sid])
+
+            all_outputs = torch.tensor(agg_outputs)
+            all_targets = torch.tensor(agg_targets)
+
+            avg_loss = total_loss / len(session_ids) # Calculate average loss per session
 
         # Convert Logits To Probabilities
         probs = torch.sigmoid(all_outputs)
@@ -159,7 +210,7 @@ class Tester:
         if isinstance(self.model, StaticModel):
             self.test_dataset = StaticDataset(test_sessions)
         else:
-            self.test_dataset = TemporalDataset(test_sessions)
+            self.test_dataset = TemporalDataset(test_sessions, chunk_len=self.chunk_len, chunk_hop=self.chunk_hop)
 
         # Initialize Test DataLoader
         if isinstance(self.model, StaticModel):
@@ -170,10 +221,17 @@ class Tester:
                 shuffle=False,
             )
         else:
+
+            # Choose collate function based on chunking
+            if getattr(self.test_dataset, 'chunk_len', None) is None:
+                collate_fn = temporal_collate_fn
+            else:
+                collate_fn = chunked_temporal_collate_fn
+
             self.test_loader = DataLoader(
                 self.test_dataset,
                 batch_size=self.batch_size,
                 num_workers=0,
                 shuffle=False,
-                collate_fn=temporal_collate_fn,
+                collate_fn=collate_fn,
             )

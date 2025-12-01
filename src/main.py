@@ -87,7 +87,7 @@ def main():
     # Testing Branch
     elif args.operation == "test":
         try:
-            tester = Tester(model, batch_size=BATCH_SIZE, use_dann=USE_DANN)
+            tester = Tester(model, batch_size=BATCH_SIZE, use_dann=USE_DANN, chunk_len=CHUNK_LEN, chunk_hop=CHUNK_HOP)
             results = tester.evaluate()
             logger.info("Test Results:")
             pprint(
