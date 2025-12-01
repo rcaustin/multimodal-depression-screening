@@ -57,8 +57,8 @@ class Trainer:
         # Apply Patient-Level Split
         train_sessions, _ = stratified_patient_split()
 
-        # FOR TESTING, REMOVE LATER
-        #train_sessions = train_sessions[:16]
+        # !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!FOR TESTING, REMOVE LATER
+        train_sessions = train_sessions[:16]
 
         # Determine Model Type and Initialize Dataset
         if isinstance(model, StaticModel):
@@ -262,6 +262,20 @@ class Trainer:
                     )
 
             self.optimizer.load_state_dict(checkpoint["optimizer_state_dict"])
+
+            # Check for mismatched chunking settings
+            ckpt_chunk_len = checkpoint.get("chunk_len", None)
+            ckpt_chunk_hop = checkpoint.get("chunk_hop", None)
+
+            if ckpt_chunk_len != self.chunk_len or ckpt_chunk_hop != self.chunk_hop:
+                logger.warning(
+                    f"Chunk configuration mismatch when resuming training:\n"
+                    f"Checkpoint chunk_len: {ckpt_chunk_len}, Current chunk_len: {self.chunk_len}\n"
+                    f"Checkpoint chunk_hop: {ckpt_chunk_hop}, Current chunk_hop: {self.chunk_hop}\n"
+                    "Training will proceed with current chunk settings.\n"
+                    "If this is unintentional, stop now and rerun with matching flags.\n"
+                )
+
             self.start_epoch = checkpoint.get("epochs_trained", 0)
             logger.info(
                 f"Resumed training from checkpoint at epoch {self.start_epoch} ({load_path})"
