@@ -180,7 +180,7 @@ class TemporalDataset(Dataset):
         if len(row) == 0:
             raise ValueError(f"No metadata found for session {session_id}")
         
-        label_tensor = torch.tensor(row.iloc[0]["PHQ8_Binary"], dtype=torch.float32)
+        label_tensor = torch.tensor(row.iloc[0]["PHQ_Binary"], dtype=torch.float32)
 
         g_raw = str(row.iloc[0]["Gender"]).strip().lower() # expects 'male' or 'female'
         if g_raw == "male":
