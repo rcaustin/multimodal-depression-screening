@@ -33,7 +33,8 @@ class Trainer:
         dann_lambda=0.1,  # Weight for domain adversary loss
         dann_alpha=1.0,  # Gradient reversal scaling factor
         chunk_len = None,
-        chunk_hop = None
+        chunk_hop = None,
+        model_name = None
     ):
         self.batch_size = batch_size
         self.epochs = epochs
@@ -56,20 +57,36 @@ class Trainer:
         # Apply Patient-Level Split
         train_sessions, _ = stratified_patient_split()
 
+        # FOR TESTING, REMOVE LATER
+        #train_sessions = train_sessions[:16]
+
         # Determine Model Type and Initialize Dataset
         if isinstance(model, StaticModel):
             train_dataset = StaticDataset(train_sessions)
-            self.model_name = "static_model.pt"
+            default_name = "static_model.pt"
             collate_fn = None  # Default Collate for Static Dataset
-        else:
+        else: # Temporal Model
             train_dataset = TemporalDataset(train_sessions, chunk_len=self.chunk_len, chunk_hop=self.chunk_hop)
-            self.model_name = "temporal_model.pt"
+            if use_dann:
+                default_name = "temporal_model_dann.pt"
+            else:
+                default_name = "temporal_model.pt"
             
             # Choose collate function based on chunking
             if self.chunk_len is None:
                 collate_fn = temporal_collate_fn # Old behavior, with padding
             else:
                 collate_fn = chunked_temporal_collate_fn # New behavior, no padding
+
+        # Choose self.model_name
+        if model_name is not None:
+            # Add .pt if missing
+            if not model_name.endswith(".pt"):
+                model_name += ".pt"
+            self.model_name = model_name
+        else:
+            self.model_name = default_name
+
 
         # Initialize DataLoader
         self.dataloader = DataLoader(
@@ -205,11 +222,6 @@ class Trainer:
         logger.info("Training Complete.")
 
     def _checkpoint_path(self):
-
-        if self.use_dann:  # Save DANN models separately
-            base, ext = os.path.splitext(self.model_name)
-            return os.path.join(self.save_dir, f"{base}_dann{ext}")
-
         return os.path.join(self.save_dir, self.model_name)
 
     def _save_checkpoint(self, epoch):
@@ -224,6 +236,8 @@ class Trainer:
             "use_dann": self.use_dann,
             "dann_lambda": self.dann_lambda,
             "dann_alpha": self.dann_alpha,
+            "chunk_len": self.chunk_len,
+            "chunk_hop": self.chunk_hop,
         }
 
         if self.domain_adversary is not None:
