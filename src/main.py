@@ -40,6 +40,12 @@ def parse_args():
         help="Enable temporal chunking (4s windows, 2s hop) for temporal models."
     )
 
+    parser.add_argument(
+        "--epochs",
+        type=int,
+        default=50,
+        help="Number of training epochs (default: 50)",
+    )
     return parser.parse_args()
 
 
@@ -49,7 +55,7 @@ def main():
     logger.info(f"Model: {args.model}")
 
     BATCH_SIZE = 8
-    EPOCHS = 50
+    EPOCHS = args.epochs
     LR = 1e-4
     USE_DANN = args.model == "DANN"
 
