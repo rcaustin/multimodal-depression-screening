@@ -9,7 +9,7 @@ from torch.utils.data import DataLoader
 from src.datasets.StaticDataset import StaticDataset
 from src.datasets.TemporalDataset import TemporalDataset
 from src.StaticModel import StaticModel
-from src.utility.collation import temporal_collate_fn
+from src.utility.collation import temporal_collate_fn, chunked_temporal_collate_fn
 from src.utility.splitting import stratified_patient_split
 
 from src.utility.grl import grad_reverse
@@ -32,6 +32,8 @@ class Trainer:
         use_dann=False,  # Whether to use Domain-Adversarial Neural Network (DANN)
         dann_lambda=0.1,  # Weight for domain adversary loss
         dann_alpha=1.0,  # Gradient reversal scaling factor
+        chunk_len = None,
+        chunk_hop = None
     ):
         self.batch_size = batch_size
         self.epochs = epochs
@@ -39,6 +41,8 @@ class Trainer:
         self.modalities = modalities
         self.device = "cpu"
         self.model = model.to(self.device)
+        self.chunk_len = chunk_len
+        self.chunk_hop = chunk_hop
 
         # Create Save Directory
         os.makedirs(save_dir, exist_ok=True)
@@ -58,9 +62,14 @@ class Trainer:
             self.model_name = "static_model.pt"
             collate_fn = None  # Default Collate for Static Dataset
         else:
-            train_dataset = TemporalDataset(train_sessions)
+            train_dataset = TemporalDataset(train_sessions, chunk_len=self.chunk_len, chunk_hop=self.chunk_hop)
             self.model_name = "temporal_model.pt"
-            collate_fn = temporal_collate_fn  # Use Custom Temporal Collate
+            
+            # Choose collate function based on chunking
+            if self.chunk_len is None:
+                collate_fn = temporal_collate_fn # Old behavior, with padding
+            else:
+                collate_fn = chunked_temporal_collate_fn # New behavior, no padding
 
         # Initialize DataLoader
         self.dataloader = DataLoader(
