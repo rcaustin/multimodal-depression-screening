@@ -57,9 +57,6 @@ class Trainer:
         # Apply Patient-Level Split
         train_sessions, _ = stratified_patient_split()
 
-        # !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!FOR TESTING, REMOVE LATER
-        train_sessions = train_sessions[:16]
-
         # Determine Model Type and Initialize Dataset
         if isinstance(model, StaticModel):
             train_dataset = StaticDataset(train_sessions)
