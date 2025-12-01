@@ -28,10 +28,13 @@ def parse_args():
     )
 
     parser.add_argument(
-        "--checkpoint",
+        "--name",
         type=str,
         default=None,
-        help="Path to a saved checkpoint (required for test mode)",
+        help="Name of a saved checkpoint. \
+              Path assumes 'models/{name}.pt', .pt automatically added if missing. \
+              If not provided, defaults used based on model type. \
+              For training, this names the saved model. For testing, this loads the model.",
     )
 
     parser.add_argument(
@@ -67,7 +70,7 @@ def main():
     else:
         CHUNK_LEN = None
         CHUNK_HOP = None
-        if args.model == "static":
+        if args.model == "static" and args.chunk:
             logger.warning("Chunking option ignored for static model.")
 
     # Initialize Model
@@ -80,14 +83,21 @@ def main():
                           epochs=EPOCHS, lr=LR, 
                           use_dann=USE_DANN, 
                           chunk_len=CHUNK_LEN, 
-                          chunk_hop=CHUNK_HOP
+                          chunk_hop=CHUNK_HOP,
+                          model_name=args.name,
         )
         trainer.run()
 
     # Testing Branch
     elif args.operation == "test":
         try:
-            tester = Tester(model, batch_size=BATCH_SIZE, use_dann=USE_DANN, chunk_len=CHUNK_LEN, chunk_hop=CHUNK_HOP)
+            tester = Tester(model, 
+                            batch_size=BATCH_SIZE, 
+                            use_dann=USE_DANN, 
+                            chunk_len=CHUNK_LEN, 
+                            chunk_hop=CHUNK_HOP, 
+                            ckpt_name=args.name,
+            )
             results = tester.evaluate()
             logger.info("Test Results:")
             pprint(
