@@ -34,6 +34,12 @@ def parse_args():
         help="Path to a saved checkpoint (required for test mode)",
     )
 
+    parser.add_argument(
+        "--chunk",
+        action='store_true',
+        help="Enable temporal chunking (4s windows, 2s hop) for temporal models."
+    )
+
     return parser.parse_args()
 
 
@@ -47,12 +53,29 @@ def main():
     LR = 1e-4
     USE_DANN = args.model == "DANN"
 
+    # Chunk config for temporal models
+    if args.chunk and args.model != "static":
+        CHUNK_LEN = 120 # 4 seconds at 30Hz 
+        CHUNK_HOP = 60  # 2 seconds at 30Hz
+        logger.info("Temporal chunking enabled: 4s windows with 2s hop.")
+    else:
+        CHUNK_LEN = None
+        CHUNK_HOP = None
+        if args.model == "static":
+            logger.warning("Chunking option ignored for static model.")
+
     # Initialize Model
     model = StaticModel() if args.model == "static" else TemporalModel()
 
     # Training Branch
     if args.operation == "train":
-        trainer = Trainer(model, batch_size=BATCH_SIZE, epochs=EPOCHS, lr=LR, use_dann=USE_DANN)
+        trainer = Trainer(model,
+                          batch_size=BATCH_SIZE, 
+                          epochs=EPOCHS, lr=LR, 
+                          use_dann=USE_DANN, 
+                          chunk_len=CHUNK_LEN, 
+                          chunk_hop=CHUNK_HOP
+        )
         trainer.run()
 
     # Testing Branch
