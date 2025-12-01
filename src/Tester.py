@@ -146,9 +146,6 @@ class Tester:
             all_outputs = torch.cat(all_outputs, dim=0).squeeze()
             all_targets = torch.cat(all_targets, dim=0).squeeze()
         
-            # Compute Average Loss
-            avg_loss = total_loss / len(self.test_dataset)
-        
         else:
             # Build per-session outputs/targets
             session_ids = sorted(session_logits.keys())
@@ -164,7 +161,8 @@ class Tester:
             all_outputs = torch.tensor(agg_outputs)
             all_targets = torch.tensor(agg_targets)
 
-            avg_loss = total_loss / len(session_ids) # Calculate average loss per session
+        # In both modes, compute loss per sample
+        avg_loss = total_loss / len(self.test_dataset)
 
         # Convert Logits To Probabilities
         probs = torch.sigmoid(all_outputs)
