@@ -28,12 +28,27 @@ def parse_args():
     )
 
     parser.add_argument(
-        "--checkpoint",
+        "--name",
         type=str,
         default=None,
-        help="Path to a saved checkpoint (required for test mode)",
+        help="Name of a saved checkpoint. \
+              Path assumes 'models/{name}.pt', .pt automatically added if missing. \
+              If not provided, defaults used based on model type. \
+              For training, this names the saved model. For testing, this loads the model.",
     )
 
+    parser.add_argument(
+        "--chunk",
+        action='store_true',
+        help="Enable temporal chunking (4s windows, 2s hop) for temporal models."
+    )
+
+    parser.add_argument(
+        "--epochs",
+        type=int,
+        default=50,
+        help="Number of training epochs (default: 50)",
+    )
     return parser.parse_args()
 
 
@@ -42,23 +57,47 @@ def main():
     logger.info(f"Operation: {args.operation}")
     logger.info(f"Model: {args.model}")
 
-    BATCH_SIZE = 1
-    EPOCHS = 50
+    BATCH_SIZE = 8
+    EPOCHS = args.epochs
     LR = 1e-4
     USE_DANN = args.model == "DANN"
+
+    # Chunk config for temporal models
+    if args.chunk and args.model != "static":
+        CHUNK_LEN = 120 # 4 seconds at 30Hz 
+        CHUNK_HOP = 60  # 2 seconds at 30Hz
+        logger.info("Temporal chunking enabled: 4s windows with 2s hop.")
+    else:
+        CHUNK_LEN = None
+        CHUNK_HOP = None
+        if args.model == "static" and args.chunk:
+            logger.warning("Chunking option ignored for static model.")
 
     # Initialize Model
     model = StaticModel() if args.model == "static" else TemporalModel()
 
     # Training Branch
     if args.operation == "train":
-        trainer = Trainer(model, batch_size=BATCH_SIZE, epochs=EPOCHS, lr=LR, use_dann=USE_DANN)
+        trainer = Trainer(model,
+                          batch_size=BATCH_SIZE, 
+                          epochs=EPOCHS, lr=LR, 
+                          use_dann=USE_DANN, 
+                          chunk_len=CHUNK_LEN, 
+                          chunk_hop=CHUNK_HOP,
+                          model_name=args.name,
+        )
         trainer.run()
 
     # Testing Branch
     elif args.operation == "test":
         try:
-            tester = Tester(model, batch_size=BATCH_SIZE, use_dann=USE_DANN)
+            tester = Tester(model, 
+                            batch_size=BATCH_SIZE, 
+                            use_dann=USE_DANN, 
+                            chunk_len=CHUNK_LEN, 
+                            chunk_hop=CHUNK_HOP, 
+                            ckpt_name=args.name,
+            )
             results = tester.evaluate()
             logger.info("Test Results:")
             pprint(

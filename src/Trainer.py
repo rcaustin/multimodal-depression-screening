@@ -9,7 +9,7 @@ from torch.utils.data import DataLoader
 from src.datasets.StaticDataset import StaticDataset
 from src.datasets.TemporalDataset import TemporalDataset
 from src.StaticModel import StaticModel
-from src.utility.collation import temporal_collate_fn
+from src.utility.collation import temporal_collate_fn, chunked_temporal_collate_fn
 from src.utility.splitting import stratified_patient_split
 
 from src.utility.grl import grad_reverse
@@ -32,6 +32,9 @@ class Trainer:
         use_dann=False,  # Whether to use Domain-Adversarial Neural Network (DANN)
         dann_lambda=0.1,  # Weight for domain adversary loss
         dann_alpha=1.0,  # Gradient reversal scaling factor
+        chunk_len = None,
+        chunk_hop = None,
+        model_name = None
     ):
         self.batch_size = batch_size
         self.epochs = epochs
@@ -39,6 +42,8 @@ class Trainer:
         self.modalities = modalities
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         self.model = model.to(self.device)
+        self.chunk_len = chunk_len
+        self.chunk_hop = chunk_hop
         
         # ---- CUDA SPEEDUP OPTION ----
         if self.device.type == "cuda":
@@ -59,12 +64,30 @@ class Trainer:
         # Determine Model Type and Initialize Dataset
         if isinstance(model, StaticModel):
             train_dataset = StaticDataset(train_sessions)
-            self.model_name = "static_model.pt"
+            default_name = "static_model.pt"
             collate_fn = None  # Default Collate for Static Dataset
+        else: # Temporal Model
+            train_dataset = TemporalDataset(train_sessions, chunk_len=self.chunk_len, chunk_hop=self.chunk_hop)
+            if use_dann:
+                default_name = "temporal_model_dann.pt"
+            else:
+                default_name = "temporal_model.pt"
+            
+            # Choose collate function based on chunking
+            if self.chunk_len is None:
+                collate_fn = temporal_collate_fn # Old behavior, with padding
+            else:
+                collate_fn = chunked_temporal_collate_fn # New behavior, no padding
+
+        # Choose self.model_name
+        if model_name is not None:
+            # Add .pt if missing
+            if not model_name.endswith(".pt"):
+                model_name += ".pt"
+            self.model_name = model_name
         else:
-            train_dataset = TemporalDataset(train_sessions)
-            self.model_name = "temporal_model.pt"
-            collate_fn = temporal_collate_fn  # Use Custom Temporal Collate
+            self.model_name = default_name
+
 
         # Initialize DataLoader
         self.dataloader = DataLoader(
@@ -200,11 +223,6 @@ class Trainer:
         logger.info("Training Complete.")
 
     def _checkpoint_path(self):
-
-        if self.use_dann:  # Save DANN models separately
-            base, ext = os.path.splitext(self.model_name)
-            return os.path.join(self.save_dir, f"{base}_dann{ext}")
-
         return os.path.join(self.save_dir, self.model_name)
 
     def _save_checkpoint(self, epoch):
@@ -219,6 +237,8 @@ class Trainer:
             "use_dann": self.use_dann,
             "dann_lambda": self.dann_lambda,
             "dann_alpha": self.dann_alpha,
+            "chunk_len": self.chunk_len,
+            "chunk_hop": self.chunk_hop,
         }
 
         if self.domain_adversary is not None:
@@ -240,6 +260,21 @@ class Trainer:
         """
         load_path = self._checkpoint_path()
 
+        self.optimizer.load_state_dict(checkpoint["optimizer_state_dict"])
+
+        # Check for mismatched chunking settings
+        ckpt_chunk_len = checkpoint.get("chunk_len", None)
+        ckpt_chunk_hop = checkpoint.get("chunk_hop", None)
+
+        if ckpt_chunk_len != self.chunk_len or ckpt_chunk_hop != self.chunk_hop:
+            raise RuntimeError(
+                f"\nChunk configuration mismatch when resuming training:\n"
+                f"Checkpoint chunk_len: {ckpt_chunk_len}, Current chunk_len: {self.chunk_len}\n"
+                f"Checkpoint chunk_hop: {ckpt_chunk_hop}, Current chunk_hop: {self.chunk_hop}\n"
+                "Training will not proceed. Re-run with matching flags.\n"
+            )
+
+        self.start_epoch = checkpoint.get("epochs_trained", 0)
         if os.path.exists(load_path):
             logger.info(
                 f"Ignoring existing checkpoint at {load_path} — starting a fresh run."
