@@ -40,7 +40,8 @@ class Tester:
         batch_size: int = 8,
         use_dann: bool = False,
         chunk_len: int | None = None,
-        chunk_hop: int | None = None
+        chunk_hop: int | None = None,
+        ckpt_name: str | None = None,
     ):
         self.device: str = "cpu"
         self.model = model.to(self.device)
@@ -49,17 +50,25 @@ class Tester:
         self.test_fraction = test_fraction
         self.chunk_len = chunk_len
         self.chunk_hop = chunk_hop
+        self.ckpt_name = ckpt_name
 
         # Determine Checkpoint Path
-        if isinstance(model, StaticModel):
-            self.checkpoint_path = "models/static_model.pt"
-        elif isinstance(model, TemporalModel):
-            if self.use_dann:
-                self.checkpoint_path = "models/temporal_model_dann.pt"
-            else:
-                self.checkpoint_path = "models/temporal_model.pt"
+        if ckpt_name is not None:
+            # Check if .pt extension is present
+            if not ckpt_name.endswith(".pt"):
+                ckpt_name += ".pt"
+            self.checkpoint_path = f"models/{ckpt_name}" # Get the custom checkpoint path
         else:
-            raise ValueError(f"Unknown Model Type: {type(model)}")
+            # Fallback to default naming
+            if isinstance(self.model, StaticModel):
+                self.checkpoint_path = "models/static_model.pt"
+            elif isinstance(self.model, TemporalModel):
+                if self.use_dann:
+                    self.checkpoint_path = "models/temporal_model_dann.pt"
+                else:
+                    self.checkpoint_path = "models/temporal_model.pt"
+            else:
+                raise ValueError(f"Unknown Model Type: {type(self.model)}")
 
         # Load Checkpoint
         self._load_checkpoint()
@@ -199,6 +208,24 @@ class Tester:
         logger.info(f"Loading Checkpoint From {self.checkpoint_path}")
         checkpoint = torch.load(self.checkpoint_path, map_location=self.device)
         self.model.load_state_dict(checkpoint["model_state_dict"])
+
+        # Load DANN if applicable
+        if self.use_dann and "domain_adversary_state_dict" in checkpoint:
+            if hasattr(self.model, 'domain_adversary') and self.model.domain_adversary is not None:
+                self.model.domain_adversary.load_state_dict(checkpoint["domain_adversary_state_dict"])
+
+        # Infer chunking parameters if not explicitly set
+        ckpt_chunk_len = checkpoint.get("chunk_len", None)
+        ckpt_chunk_hop = checkpoint.get("chunk_hop", None)
+
+        if self.chunk_len is None and ckpt_chunk_len is not None:
+            self.chunk_len = ckpt_chunk_len
+
+        if self.chunk_hop is None and ckpt_chunk_hop is not None:
+            self.chunk_hop = ckpt_chunk_hop
+            
+        logger.info(f"Test chunk_len: {self.chunk_len}, chunk_hop: {self.chunk_hop}")
+
 
     def _prepare_dataset_and_loader(self):
         # Split Dataset By Patient
