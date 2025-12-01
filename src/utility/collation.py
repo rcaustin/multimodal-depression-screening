@@ -40,3 +40,38 @@ def temporal_collate_fn(batch):
     collated["session"] = [b["session"] for b in batch]
 
     return collated
+
+def chunked_temporal_collate_fn(batch):
+    """
+    Collate function for chunked temporal data.
+
+    Assumes each sample in batch is a dict, Temporal modalities are 2D tensors [T, D], label is scalar tensor.
+    
+    Returns:
+        dict with:
+            - temporal tensors stacked to [B, T, D]
+            - label/gender stacked to [B]
+            -session/start kept as lists
+    """
+    collated = {}
+
+    # Get the keys from the first sample
+    keys = batch[0].keys()
+
+    for k in keys:
+        v0 = batch[0][k]
+
+        # Handle 2D temporal tensors
+        if isinstance(v0, torch.Tensor) and v0.dim() == 2:
+            # In chunked mode, T is the same for all items. Just stack.
+            collated[k] = torch.stack([b[k] for b in batch])  # [B, T, D]
+
+        # Handle scalar tensors
+        elif isinstance(v0, torch.Tensor):
+            collated[k] = torch.stack([b[k] for b in batch])  # [B]
+
+        # Handle non-tensor items (e.g., session IDs, start indices)
+        else:
+            collated[k] = [b[k] for b in batch]
+
+    return collated
