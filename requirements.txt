@@ -54,7 +54,7 @@ setuptools==80.9.0
 six==1.17.0
 sympy==1.14.0
 threadpoolctl==3.6.0
-tokenizers==0.22.1
+tokenizers
 torch
 torchaudio
 torchmetrics==1.8.2
