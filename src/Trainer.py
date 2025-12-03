@@ -39,8 +39,7 @@ class Trainer:
         self.epochs = epochs
         self.lr = lr
         self.modalities = modalities
-        #self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-        self.device = torch.device("cpu") # Force CPU for now
+        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         self.model = model.to(self.device)
         self.chunk_len = chunk_len
         self.chunk_hop = chunk_hop
