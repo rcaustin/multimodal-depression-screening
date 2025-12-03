@@ -15,8 +15,6 @@ from src.utility.splitting import stratified_patient_split
 from src.utility.grl import grad_reverse
 from src.components.DomainAdversary import DANN
 
-from torch.utils.data import Subset # For temporary dataset subsetting
-
 class Trainer:
     """
     Trainer class handles dataset loading, model training, evaluation, checkpointing, and saving.
@@ -70,7 +68,6 @@ class Trainer:
             collate_fn = None  # Default Collate for Static Dataset
         else: # Temporal Model
             train_dataset = TemporalDataset(train_sessions, chunk_len=self.chunk_len, chunk_hop=self.chunk_hop)
-            train_dataset = Subset(train_dataset, list(range(16))) # TEMPORARY: SMALLER DATASET FOR DEBUGGING
             if use_dann:
                 default_name = "temporal_model_dann.pt"
             else:
@@ -150,7 +147,7 @@ class Trainer:
             epoch_loss = 0.0
             epoch_domain_loss = 0.0
 
-            for batch_idx, batch in enumerate(self.dataloader): # DEBUG: added batch_idx, enumerate()
+            for batch in self.dataloader: 
                 self.optimizer.zero_grad()
 
                 # Move Features To Device
@@ -170,8 +167,6 @@ class Trainer:
                 # Move lengths to device
                 lengths = batch["lengths"].to(self.device)
 
-                if epoch == 0 and batch_idx == 0:
-                    print("Text,",text.shape,"lengths:",lengths)
 
                 # Get gender labels for DANN if available
                 gender = batch.get("gender")
