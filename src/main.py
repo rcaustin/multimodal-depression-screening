@@ -8,6 +8,7 @@ from src.StaticModel import StaticModel
 from src.TemporalModel import TemporalModel
 from src.Tester import Tester
 from src.Trainer import Trainer
+from src.Evaluator import Evaluator
 
 
 def parse_args():
@@ -17,8 +18,8 @@ def parse_args():
 
     parser.add_argument(
         "operation",
-        choices=["train", "test"],
-        help="Operation mode: 'train' or 'test'",
+        choices=["train", "test", "eval"],
+        help="Operation mode: 'train', 'test', or 'eval'",
     )
 
     parser.add_argument(
@@ -39,8 +40,8 @@ def parse_args():
 
     parser.add_argument(
         "--chunk",
-        action='store_true',
-        help="Enable temporal chunking (4s windows, 2s hop) for temporal models."
+        action="store_true",
+        help="Enable temporal chunking (4s windows, 2s hop) for temporal models.",
     )
 
     parser.add_argument(
@@ -49,6 +50,15 @@ def parse_args():
         default=50,
         help="Number of training epochs (default: 50)",
     )
+
+    parser.add_argument(
+        "--sessions",
+        type=str,
+        nargs="+",
+        help="Session ID(s) to evaluate (for 'eval' operation only). \
+              Accepts one or more session IDs separated by spaces.",
+    )
+
     return parser.parse_args()
 
 
@@ -64,7 +74,7 @@ def main():
 
     # Chunk config for temporal models
     if args.chunk and args.model != "static":
-        CHUNK_LEN = 120 # 4 seconds at 30Hz 
+        CHUNK_LEN = 120  # 4 seconds at 30Hz
         CHUNK_HOP = 60  # 2 seconds at 30Hz
         logger.info("Temporal chunking enabled: 4s windows with 2s hop.")
     else:
@@ -78,25 +88,28 @@ def main():
 
     # Training Branch
     if args.operation == "train":
-        trainer = Trainer(model,
-                          batch_size=BATCH_SIZE, 
-                          epochs=EPOCHS, lr=LR, 
-                          use_dann=USE_DANN, 
-                          chunk_len=CHUNK_LEN, 
-                          chunk_hop=CHUNK_HOP,
-                          model_name=args.name,
+        trainer = Trainer(
+            model,
+            batch_size=BATCH_SIZE,
+            epochs=EPOCHS,
+            lr=LR,
+            use_dann=USE_DANN,
+            chunk_len=CHUNK_LEN,
+            chunk_hop=CHUNK_HOP,
+            model_name=args.name,
         )
         trainer.run()
 
     # Testing Branch
     elif args.operation == "test":
         try:
-            tester = Tester(model, 
-                            batch_size=BATCH_SIZE, 
-                            use_dann=USE_DANN, 
-                            chunk_len=CHUNK_LEN, 
-                            chunk_hop=CHUNK_HOP, 
-                            ckpt_name=args.name,
+            tester = Tester(
+                model,
+                batch_size=BATCH_SIZE,
+                use_dann=USE_DANN,
+                chunk_len=CHUNK_LEN,
+                chunk_hop=CHUNK_HOP,
+                ckpt_name=args.name,
             )
             results = tester.evaluate()
             logger.info("Test Results:")
@@ -108,6 +121,33 @@ def main():
                 f"Checkpoint not found for {args.model} model. "
                 f"Try running '{args.model} train' first."
             )
+
+    # Evaluation Branch (specific sessions)
+    elif args.operation == "eval":
+        if not args.sessions:
+            logger.error(
+                "No session IDs provided. Use --sessions to specify one or more session IDs."
+            )
+            return
+
+        try:
+            evaluator = Evaluator(
+                model,
+                session_ids=args.sessions,
+                ckpt_name=args.name,
+                use_dann=USE_DANN,
+                chunk_len=CHUNK_LEN,
+                chunk_hop=CHUNK_HOP,
+            )
+            results = evaluator.evaluate()
+            evaluator.print_results(results)
+        except FileNotFoundError:
+            logger.warning(
+                f"Checkpoint not found for {args.model} model. "
+                f"Try running '{args.model} train' first."
+            )
+        except ValueError as e:
+            logger.error(f"Evaluation error: {e}")
 
     else:
         raise ValueError(f"Unknown operation: {args.operation}")
