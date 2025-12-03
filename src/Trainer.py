@@ -182,7 +182,7 @@ class Trainer:
                 if self.use_dann and self.domain_adversary is not None:
                     # Get the logits and features from the model
                     output, features = self.model(
-                        text, audio, visual, return_features=True
+                        text, audio, visual, return_features=True, lengths=lengths
                     )
                     output = output.view(-1)
 
