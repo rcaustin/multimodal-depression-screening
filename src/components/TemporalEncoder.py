@@ -1,7 +1,7 @@
 from typing import Optional
 import torch
 import torch.nn as nn
-
+from torch.nn.utils.rnn import pack_padded_sequence, pad_packed_sequence
 
 class TemporalEncoder(nn.Module):
     """
@@ -69,7 +69,7 @@ class TemporalEncoder(nn.Module):
 
         self.layer_norm = nn.LayerNorm(hidden_dim)
 
-    def forward(self, input_sequence: torch.Tensor) -> torch.Tensor:
+    def forward(self, input_sequence: torch.Tensor, lengths: torch.Tensor | None = None) -> torch.Tensor:
         """
         Forward pass for the temporal encoder.
 
@@ -83,8 +83,16 @@ class TemporalEncoder(nn.Module):
         if input_sequence.ndim == 2:
             input_sequence = input_sequence.unsqueeze(1)  # Add seq_len=1 if missing
 
+        B, T, _ = input_sequence.shape
+
+        if lengths is None:
+            lengths = torch.full((B,), T, dtype=torch.long, device=input_sequence.device)
+
         if self.model_type == "lstm":
+            self.encoder.flatten_parameters()
+
             sequence_outputs, (final_hidden_state, _) = self.encoder(input_sequence)
+        
         elif self.model_type == "transformer":
             sequence_outputs = self.encoder(input_sequence)
             sequence_outputs = self.output_projection(sequence_outputs)
@@ -96,16 +104,29 @@ class TemporalEncoder(nn.Module):
             return self.layer_norm(sequence_outputs)
 
         # Pooling options
+        mask_valid = ( # True for real data, False for padding
+            torch.arange(T, device=sequence_outputs.device)[None, :].expand(B, T) < lengths[:, None]
+        )
+        mask_valid_f = mask_valid.unsqueeze(-1).float()
+
         if self.pooling == "last":
-            pooled_output = (
-                final_hidden_state[-1]
-                if self.model_type == "lstm"
-                else sequence_outputs[:, -1, :]
-            )
+            if self.model_type == "lstm":
+                pooled_output = final_hidden_state[-1]  # [B, H]
+            else:
+                idx = (lengths - 1).clamp(min=0)  # [B]
+                pooled_output = sequence_outputs[torch.arange(B), idx, :]  # [B, H]
+        
         elif self.pooling == "mean":
-            pooled_output = sequence_outputs.mean(dim=1)
+            summed = (sequence_outputs * mask_valid_f).sum(dim=1)  # [B, H]
+            denom = lengths.clamp(min=1).unsqueeze(-1)
+            pooled_output = summed / denom
+        
         elif self.pooling == "max":
-            pooled_output, _ = sequence_outputs.max(dim=1)
+            huge_neg = torch.finfo(sequence_outputs.dtype).min
+            masked_seq = sequence_outputs.clone()
+            masked_seq[~mask_valid] = huge_neg
+            pooled_output, _ = masked_seq.max(dim=1)
+
         else:
             raise ValueError(f"Unsupported pooling type: {self.pooling}")
 

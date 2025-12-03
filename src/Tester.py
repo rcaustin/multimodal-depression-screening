@@ -17,6 +17,8 @@ from src.TemporalModel import TemporalModel
 from src.utility.collation import temporal_collate_fn, chunked_temporal_collate_fn
 from src.utility.splitting import stratified_patient_split
 
+from torch.utils.data import Subset # For temporary dataset subsetting
+
 
 class Tester:
     """
@@ -236,7 +238,8 @@ class Tester:
             self.test_dataset = StaticDataset(test_sessions)
         else:
             self.test_dataset = TemporalDataset(test_sessions, chunk_len=self.chunk_len, chunk_hop=self.chunk_hop)
-
+            self.test_dataset = Subset(self.test_dataset, list(range(16))) # TEMPORARY: SMALLER DATASET FOR DEBUGGING
+            
         # Initialize Test DataLoader
         if isinstance(self.model, StaticModel):
             self.test_loader = DataLoader(

@@ -15,6 +15,7 @@ from src.utility.splitting import stratified_patient_split
 from src.utility.grl import grad_reverse
 from src.components.DomainAdversary import DANN
 
+from torch.utils.data import Subset # For temporary dataset subsetting
 
 class Trainer:
     """
@@ -24,7 +25,7 @@ class Trainer:
     def __init__(
         self,
         model,
-        batch_size=8,
+        batch_size=1,
         epochs=50,
         lr=1e-4,
         modalities=("text", "audio", "visual"),
@@ -40,7 +41,8 @@ class Trainer:
         self.epochs = epochs
         self.lr = lr
         self.modalities = modalities
-        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        #self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        self.device = torch.device("cpu") # Force CPU for now
         self.model = model.to(self.device)
         self.chunk_len = chunk_len
         self.chunk_hop = chunk_hop
@@ -68,6 +70,7 @@ class Trainer:
             collate_fn = None  # Default Collate for Static Dataset
         else: # Temporal Model
             train_dataset = TemporalDataset(train_sessions, chunk_len=self.chunk_len, chunk_hop=self.chunk_hop)
+            train_dataset = Subset(train_dataset, list(range(16))) # TEMPORARY: SMALLER DATASET FOR DEBUGGING
             if use_dann:
                 default_name = "temporal_model_dann.pt"
             else:
@@ -147,7 +150,7 @@ class Trainer:
             epoch_loss = 0.0
             epoch_domain_loss = 0.0
 
-            for batch in self.dataloader:
+            for batch_idx, batch in enumerate(self.dataloader): # DEBUG: added batch_idx, enumerate()
                 self.optimizer.zero_grad()
 
                 # Move Features To Device
@@ -163,6 +166,12 @@ class Trainer:
                     audio = audio.to(self.device)
                 if visual is not None:
                     visual = visual.to(self.device)
+
+                # Move lengths to device
+                lengths = batch["lengths"].to(self.device)
+
+                if epoch == 0 and batch_idx == 0:
+                    print("Text,",text.shape,"lengths:",lengths)
 
                 # Get gender labels for DANN if available
                 gender = batch.get("gender")
@@ -195,7 +204,7 @@ class Trainer:
 
                 # === Standard path ===
                 else:
-                    output = self.model(text, audio, visual).view(-1)
+                    output = self.model(text, audio, visual, lengths=lengths).view(-1)
                     loss = self.criterion(output, label)
                     epoch_loss += loss.item()
 
