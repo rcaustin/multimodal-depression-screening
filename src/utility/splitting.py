@@ -7,6 +7,7 @@ from sklearn.model_selection import train_test_split
 TRAIN_SPLIT = 0.8
 RANDOM_STATE = 42
 
+
 def stratified_patient_split(
     test_fraction=0.2,
     seed=42,
