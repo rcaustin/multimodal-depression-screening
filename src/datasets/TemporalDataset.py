@@ -38,8 +38,8 @@ class TemporalDataset(Dataset):
         step_hz=30.0,
         transform=None,
         cache=True,
-        chunk_len = None,
-        chunk_hop = None
+        chunk_len=None,
+        chunk_hop=None,
     ):
         self.session_ids = sessions
         self.data_dir = data_dir
@@ -87,9 +87,7 @@ class TemporalDataset(Dataset):
         cache_exists = all(os.path.exists(path) for path in cache_paths.values())
 
         if self.cache and cache_exists:
-            features = {
-                mod: torch.load(path) for mod, path in cache_paths.items()
-            }
+            features = {mod: torch.load(path) for mod, path in cache_paths.items()}
         else:
             # Load raw features and timestamps
             features_with_ts = {}
@@ -116,14 +114,13 @@ class TemporalDataset(Dataset):
             if self.cache:
                 for mod, seq in features.items():
                     torch.save(seq, cache_paths[mod])
-        
-        return features
 
+        return features
 
     def _build_index(self):
         """
         Build an index of sessions (session_id, start) pairs.
-        
+
         In full session mode (chunk_len = None), there is exactly one entry per session with start = None.
         In chunked mode, sliding windows of length chunk_len and hop chunk_hop are created.
         """
@@ -135,7 +132,7 @@ class TemporalDataset(Dataset):
             for sid in self.session_ids:
                 index.append((sid, None))
             return index
-        
+
         # Chunked mode: build chunks for each session
         for sid in self.session_ids:
             features = self._load_aligned_features(sid)
@@ -146,13 +143,15 @@ class TemporalDataset(Dataset):
             start = 0
             while start + self.chunk_len <= T:
                 index.append((sid, start))
-                start += self.chunk_hop # Final tail chunk is dropped to eliminate padding requirement
+                start += (
+                    self.chunk_hop
+                )  # Final tail chunk is dropped to eliminate padding requirement
 
         return index
-    
+
     # Dataset interface
     def __len__(self):
-        return len(self.index) # In full session mode, len == number of sessions
+        return len(self.index)  # In full session mode, len == number of sessions
 
     def __getitem__(self, idx):
         # Resolve session / chunk
@@ -164,10 +163,7 @@ class TemporalDataset(Dataset):
         # In in chunking mode, slice the features to [chunk_len, D]
         if self.chunk_len is not None and start is not None:
             end = start + self.chunk_len
-            features = {
-                mod: seq[start:end]
-                for mod, seq in features.items()
-            }
+            features = {mod: seq[start:end] for mod, seq in features.items()}
 
         # Optional transform
         if self.transform:
@@ -179,16 +175,18 @@ class TemporalDataset(Dataset):
         ]
         if len(row) == 0:
             raise ValueError(f"No metadata found for session {session_id}")
-        
+
         label_tensor = torch.tensor(row.iloc[0]["PHQ_Binary"], dtype=torch.float32)
 
-        g_raw = str(row.iloc[0]["Gender"]).strip().lower() # expects 'male' or 'female'
+        g_raw = str(row.iloc[0]["Gender"]).strip().lower()  # expects 'male' or 'female'
         if g_raw == "male":
             gender = 0.0
         elif g_raw == "female":
             gender = 1.0
         else:
-            logger.warning(f"Unknown gender '{g_raw}' for session {session_id}, defaulting to 0.0")
+            logger.warning(
+                f"Unknown gender '{g_raw}' for session {session_id}, defaulting to 0.0"
+            )
             gender = 0.0
 
         gender_tensor = torch.tensor(gender, dtype=torch.float32)
@@ -204,4 +202,4 @@ class TemporalDataset(Dataset):
         if self.chunk_len is not None:
             sample["start"] = start
 
-        return sample        
+        return sample
