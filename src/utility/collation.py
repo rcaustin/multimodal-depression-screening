@@ -18,6 +18,11 @@ def temporal_collate_fn(batch):
     """
     collated = {}
 
+    # Get the lengths before padding
+    lengths = torch.tensor(
+        [b["visual"].shape[0] for b in batch], dtype=torch.long)
+    collated["lengths"] = lengths
+
     # Process modalities
     for k in ["text", "audio", "visual"]:
         max_len = max(b[k].shape[0] for b in batch)

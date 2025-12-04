@@ -109,7 +109,12 @@ class Tester:
                 text_seq = batch["text"].to(self.device)
                 audio_seq = batch["audio"].to(self.device)
                 visual_seq = batch["visual"].to(self.device)
-                outputs = self.model(text_seq, audio_seq, visual_seq)
+
+                lengths = batch.get("lengths")
+                if lengths is not None:
+                    lengths = lengths.to(self.device)
+                    
+                outputs = self.model(text_seq, audio_seq, visual_seq, lengths=lengths)
             else:
                 text = batch.get("text")
                 audio = batch.get("audio")

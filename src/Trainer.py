@@ -15,7 +15,6 @@ from src.utility.splitting import stratified_patient_split
 from src.utility.grl import grad_reverse
 from src.components.DomainAdversary import DANN
 
-
 class Trainer:
     """
     Trainer class handles dataset loading, model training, evaluation, checkpointing, and saving.
@@ -24,7 +23,7 @@ class Trainer:
     def __init__(
         self,
         model,
-        batch_size=8,
+        batch_size=1,
         epochs=50,
         lr=1e-4,
         modalities=("text", "audio", "visual"),
@@ -148,7 +147,7 @@ class Trainer:
             epoch_loss = 0.0
             epoch_domain_loss = 0.0
 
-            for batch in self.dataloader:
+            for batch in self.dataloader: 
                 self.optimizer.zero_grad()
 
                 # Move Features To Device
@@ -165,6 +164,10 @@ class Trainer:
                 if visual is not None:
                     visual = visual.to(self.device)
 
+                # Move lengths to device
+                lengths = batch["lengths"].to(self.device)
+
+
                 # Get gender labels for DANN if available
                 gender = batch.get("gender")
                 if gender is not None:
@@ -174,7 +177,7 @@ class Trainer:
                 if self.use_dann and self.domain_adversary is not None:
                     # Get the logits and features from the model
                     output, features = self.model(
-                        text, audio, visual, return_features=True
+                        text, audio, visual, return_features=True, lengths=lengths
                     )
                     output = output.view(-1)
 
@@ -196,7 +199,7 @@ class Trainer:
 
                 # === Standard path ===
                 else:
-                    output = self.model(text, audio, visual).view(-1)
+                    output = self.model(text, audio, visual, lengths=lengths).view(-1)
                     loss = self.criterion(output, label)
                     epoch_loss += loss.item()
 

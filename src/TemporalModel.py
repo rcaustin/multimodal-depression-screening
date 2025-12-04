@@ -69,6 +69,7 @@ class TemporalModel(nn.Module):
         audio_seq: torch.Tensor,
         visual_seq: torch.Tensor,
         return_features: bool = False,
+        lengths: torch.Tensor | None = None,
     ) -> torch.Tensor:
         """
         Forward pass with aligned temporal sequences.
@@ -82,9 +83,9 @@ class TemporalModel(nn.Module):
             [B, 1] logits
         """
         # Encode each modality (sequence-to-sequence)
-        text_emb = self.text_encoder(text_seq)  # [B, T, H]
-        audio_emb = self.audio_encoder(audio_seq)  # [B, T, H]
-        visual_emb = self.visual_encoder(visual_seq)  # [B, T, H]
+        text_emb = self.text_encoder(text_seq, lengths=lengths)  # [B, T, H]
+        audio_emb = self.audio_encoder(audio_seq, lengths=lengths)  # [B, T, H]
+        visual_emb = self.visual_encoder(visual_seq, lengths=lengths)  # [B, T, H]
 
         # Apply learnable gates
         gT = self.text_gate(text_emb)
