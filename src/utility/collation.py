@@ -46,12 +46,14 @@ def temporal_collate_fn(batch):
 
     return collated
 
+
 def chunked_temporal_collate_fn(batch):
     """
     Collate function for chunked temporal data.
 
-    Assumes each sample in batch is a dict, Temporal modalities are 2D tensors [T, D], label is scalar tensor.
-    
+    Assumes each sample in batch is a dict, Temporal modalities are
+    2D tensors [T, D], label is scalar tensor.
+
     Returns:
         dict with:
             - temporal tensors stacked to [B, T, D]

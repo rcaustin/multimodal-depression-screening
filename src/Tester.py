@@ -35,7 +35,8 @@ class Tester:
     """
 
     def __init__(
-        self, model: torch.nn.Module,
+        self,
+        model: torch.nn.Module,
         test_fraction: float = 0.2,
         batch_size: int = 8,
         use_dann: bool = False,
@@ -57,7 +58,9 @@ class Tester:
             # Check if .pt extension is present
             if not ckpt_name.endswith(".pt"):
                 ckpt_name += ".pt"
-            self.checkpoint_path = f"models/{ckpt_name}" # Get the custom checkpoint path
+            self.checkpoint_path = (
+                f"models/{ckpt_name}"  # Get the custom checkpoint path
+            )
         else:
             # Fallback to default naming
             if isinstance(self.model, StaticModel):
@@ -83,11 +86,15 @@ class Tester:
     def evaluate(self) -> Dict:
         # Set Model To Evaluation Mode
         self.model.eval()
-        
+
         total_loss = 0.0
 
         # Detect whether we're evaluating on chunked temporal dataset
-        chunked = isinstance(self.model, TemporalModel) and hasattr(self.test_dataset, 'chunk_len') and self.test_dataset.chunk_len is not None
+        chunked = (
+            isinstance(self.model, TemporalModel)
+            and hasattr(self.test_dataset, "chunk_len")
+            and self.test_dataset.chunk_len is not None
+        )
 
         if not chunked:
             all_outputs, all_targets = [], []
@@ -135,7 +142,7 @@ class Tester:
             if not chunked:
                 all_outputs.append(outputs.cpu())
                 all_targets.append(targets.cpu())
-            else: # Chunked mode
+            else:  # Chunked mode
                 # Aggregate logits per session
                 sessions = batch["session"]  # List of session IDs
                 logits = outputs.detach().cpu().view(-1)  # [B]
@@ -152,14 +159,16 @@ class Tester:
                     if sid in session_targets:
                         # Safety check, make sure labels match
                         if session_targets[sid] != targ_int:
-                            logger.warning(f"Conflicting labels for session {sid}, {session_targets[sid]} vs {targ_int}")
+                            logger.warning(
+                                f"Conflicting labels for session {sid}, {session_targets[sid]} vs {targ_int}"
+                            )
                     session_targets[sid] = targ_int
 
         # Concatenate All Batches or Aggregate Chunked Results
         if not chunked:
             all_outputs = torch.cat(all_outputs, dim=0).squeeze()
             all_targets = torch.cat(all_targets, dim=0).squeeze()
-        
+
         else:
             # Build per-session outputs/targets
             session_ids = sorted(session_logits.keys())
@@ -216,8 +225,13 @@ class Tester:
 
         # Load DANN if applicable
         if self.use_dann and "domain_adversary_state_dict" in checkpoint:
-            if hasattr(self.model, 'domain_adversary') and self.model.domain_adversary is not None:
-                self.model.domain_adversary.load_state_dict(checkpoint["domain_adversary_state_dict"])
+            if (
+                hasattr(self.model, "domain_adversary")
+                and self.model.domain_adversary is not None
+            ):
+                self.model.domain_adversary.load_state_dict(
+                    checkpoint["domain_adversary_state_dict"]
+                )
 
         # Infer chunking parameters if not explicitly set
         ckpt_chunk_len = checkpoint.get("chunk_len", None)
@@ -228,9 +242,8 @@ class Tester:
 
         if self.chunk_hop is None and ckpt_chunk_hop is not None:
             self.chunk_hop = ckpt_chunk_hop
-            
-        logger.info(f"Test chunk_len: {self.chunk_len}, chunk_hop: {self.chunk_hop}")
 
+        logger.info(f"Test chunk_len: {self.chunk_len}, chunk_hop: {self.chunk_hop}")
 
     def _prepare_dataset_and_loader(self):
         # Split Dataset By Patient
@@ -240,8 +253,10 @@ class Tester:
         if isinstance(self.model, StaticModel):
             self.test_dataset = StaticDataset(test_sessions)
         else:
-            self.test_dataset = TemporalDataset(test_sessions, chunk_len=self.chunk_len, chunk_hop=self.chunk_hop)
-            
+            self.test_dataset = TemporalDataset(
+                test_sessions, chunk_len=self.chunk_len, chunk_hop=self.chunk_hop
+            )
+
         # Initialize Test DataLoader
         if isinstance(self.model, StaticModel):
             self.test_loader = DataLoader(
@@ -253,7 +268,7 @@ class Tester:
         else:
 
             # Choose collate function based on chunking
-            if getattr(self.test_dataset, 'chunk_len', None) is None:
+            if getattr(self.test_dataset, "chunk_len", None) is None:
                 collate_fn = temporal_collate_fn
             else:
                 collate_fn = chunked_temporal_collate_fn

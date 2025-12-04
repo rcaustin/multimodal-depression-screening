@@ -31,9 +31,9 @@ class Trainer:
         use_dann=False,  # Whether to use Domain-Adversarial Neural Network (DANN)
         dann_lambda=0.1,  # Weight for domain adversary loss
         dann_alpha=1.0,  # Gradient reversal scaling factor
-        chunk_len = None,
-        chunk_hop = None,
-        model_name = None
+        chunk_len=None,
+        chunk_hop=None,
+        model_name=None,
     ):
         self.batch_size = batch_size
         self.epochs = epochs
@@ -43,7 +43,7 @@ class Trainer:
         self.model = model.to(self.device)
         self.chunk_len = chunk_len
         self.chunk_hop = chunk_hop
-        
+
         # ---- CUDA SPEEDUP OPTION ----
         if self.device.type == "cuda":
             torch.backends.cudnn.benchmark = True
@@ -65,18 +65,20 @@ class Trainer:
             train_dataset = StaticDataset(train_sessions)
             default_name = "static_model.pt"
             collate_fn = None  # Default Collate for Static Dataset
-        else: # Temporal Model
-            train_dataset = TemporalDataset(train_sessions, chunk_len=self.chunk_len, chunk_hop=self.chunk_hop)
+        else:  # Temporal Model
+            train_dataset = TemporalDataset(
+                train_sessions, chunk_len=self.chunk_len, chunk_hop=self.chunk_hop
+            )
             if use_dann:
                 default_name = "temporal_model_dann.pt"
             else:
                 default_name = "temporal_model.pt"
-            
+
             # Choose collate function based on chunking
             if self.chunk_len is None:
-                collate_fn = temporal_collate_fn # Old behavior, with padding
+                collate_fn = temporal_collate_fn  # Old behavior, with padding
             else:
-                collate_fn = chunked_temporal_collate_fn # New behavior, no padding
+                collate_fn = chunked_temporal_collate_fn  # New behavior, no padding
 
         # Choose self.model_name
         if model_name is not None:
@@ -86,7 +88,6 @@ class Trainer:
             self.model_name = model_name
         else:
             self.model_name = default_name
-
 
         # Initialize DataLoader
         self.dataloader = DataLoader(
@@ -261,7 +262,9 @@ class Trainer:
             # Restore DANN if applicable
             if self.use_dann and "domain_adversary_state_dict" in checkpoint:
                 if self.domain_adversary is not None:
-                    self.domain_adversary.load_state_dict(checkpoint["domain_adversary_state_dict"])
+                    self.domain_adversary.load_state_dict(
+                        checkpoint["domain_adversary_state_dict"]
+                    )
 
             self.optimizer.load_state_dict(checkpoint["optimizer_state_dict"])
 
