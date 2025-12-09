@@ -14,6 +14,7 @@ from src.utility.splitting import stratified_patient_split
 
 from src.utility.grl import grad_reverse
 from src.components.DomainAdversary import DANN
+from src.utility.visualization import plot_loss_curve, plot_domain_loss_curve
 
 class Trainer:
     """
@@ -126,6 +127,14 @@ class Trainer:
             # Original optimizer for model only
             self.optimizer = torch.optim.Adam(self.model.parameters(), lr=self.lr)
 
+        # Initialize loss tracking
+        self.train_losses = []
+        self.domain_losses = []
+
+        # Create results directory
+        self.results_dir = "results"
+        os.makedirs(self.results_dir, exist_ok=True)
+
         # Check for Existing Checkpoint
         self.start_epoch = 0
         self._load_checkpoint_if_available()
@@ -221,8 +230,16 @@ class Trainer:
                 f"Time: {elapsed:.2f}s"
             )
 
+            # Track losses
+            self.train_losses.append(avg_loss)
+            if self.use_dann:
+                self.domain_losses.append(avg_domain_loss)
+
             # Save Checkpoint Each Epoch
             self._save_checkpoint(epoch + 1)
+
+            # Generate and save loss curves
+            self._save_loss_curves()
 
         logger.info("Training Complete.")
 
@@ -243,6 +260,8 @@ class Trainer:
             "dann_alpha": self.dann_alpha,
             "chunk_len": self.chunk_len,
             "chunk_hop": self.chunk_hop,
+            "train_losses": self.train_losses,
+            "domain_losses": self.domain_losses,
         }
 
         if self.domain_adversary is not None:
@@ -281,6 +300,38 @@ class Trainer:
                 )
 
             self.start_epoch = checkpoint.get("epochs_trained", 0)
+
+            # Restore loss history if available
+            self.train_losses = checkpoint.get("train_losses", [])
+            self.domain_losses = checkpoint.get("domain_losses", [])
         else:
             logger.info("No existing checkpoint found — starting fresh.")
             self.start_epoch = 0
+
+    def _save_loss_curves(self):
+        """Generate and save loss curve visualizations."""
+        if len(self.train_losses) == 0:
+            return
+
+        # Determine model type for filename
+        model_type = type(self.model).__name__.lower()
+        base_name = self.model_name.replace(".pt", "")
+
+        # Save training loss curve
+        loss_path = os.path.join(self.results_dir, f"{base_name}_loss_curve.png")
+
+        if self.use_dann and len(self.domain_losses) > 0:
+            # Save combined task and domain loss curves
+            plot_domain_loss_curve(
+                self.train_losses,
+                self.domain_losses,
+                save_path=loss_path,
+                title=f"{model_type.title().replace("model", " Model")} Training Loss Curves",
+            )
+        else:
+            # Save only task loss curve
+            plot_loss_curve(
+                self.train_losses,
+                save_path=loss_path,
+                title=f"{model_type.title().replace("model", " Model")} Training Loss Curve",
+            )

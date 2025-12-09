@@ -147,7 +147,9 @@ def initialize_model(args):
 # ============================================================================
 
 
-def run_training(model, args, use_dann: bool, chunk_len: int | None, chunk_hop: int | None):
+def run_training(
+    model, args, use_dann: bool, chunk_len: int | None, chunk_hop: int | None
+):
     """
     Execute model training.
 
@@ -175,7 +177,9 @@ def run_training(model, args, use_dann: bool, chunk_len: int | None, chunk_hop: 
     logger.info("Training complete.")
 
 
-def run_testing(model, args, use_dann: bool, chunk_len: int | None, chunk_hop: int | None):
+def run_testing(
+    model, args, use_dann: bool, chunk_len: int | None, chunk_hop: int | None
+):
     """
     Execute model testing on the test set.
 
@@ -210,7 +214,9 @@ def run_testing(model, args, use_dann: bool, chunk_len: int | None, chunk_hop: i
         )
 
 
-def run_evaluation(model, args, use_dann: bool, chunk_len: int | None, chunk_hop: int | None):
+def run_evaluation(
+    model, args, use_dann: bool, chunk_len: int | None, chunk_hop: int | None
+):
     """
     Execute evaluation on specific sessions.
 

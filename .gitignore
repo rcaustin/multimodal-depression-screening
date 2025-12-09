@@ -6,3 +6,6 @@ __pycache__/
 data/
 
 models/
+
+CLAUDE.md
+results/
