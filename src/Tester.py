@@ -312,7 +312,7 @@ class Tester:
             y_true,
             y_pred,
             save_path=cm_path,
-            title=f"{model_type} Confusion Matrix",
+            title=f"{model_type.replace("Model", " Model")} Confusion Matrix",
             class_names=["No Depression", "Depression"],
         )
 

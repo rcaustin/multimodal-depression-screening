@@ -310,12 +310,12 @@ class Trainer:
                 self.train_losses,
                 self.domain_losses,
                 save_path=loss_path,
-                title=f"{model_type.title()} Training Loss Curves",
+                title=f"{model_type.title().replace("model", " Model")} Training Loss Curves",
             )
         else:
             # Save only task loss curve
             plot_loss_curve(
                 self.train_losses,
                 save_path=loss_path,
-                title=f"{model_type.title()} Training Loss Curve",
+                title=f"{model_type.title().replace("model", " Model")} Training Loss Curve",
             )
