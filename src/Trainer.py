@@ -14,6 +14,7 @@ from src.utility.splitting import stratified_patient_split
 
 from src.utility.grl import grad_reverse
 from src.components.DomainAdversary import DANN
+from src.utility.visualization import plot_loss_curve, plot_domain_loss_curve
 
 
 class Trainer:
@@ -106,9 +107,7 @@ class Trainer:
         self.domain_adversary = None
         self.domain_criterion = None
 
-        if self.use_dann and not isinstance(
-            model, StaticModel
-        ):  # DANN only for Temporal Models
+        if self.use_dann and not isinstance(model, StaticModel):  # DANN only for Temporal Models
             feature_dim = getattr(
                 self.model, "hidden_dim", 128
             )  # Uses the hidden_dim from model as input size
@@ -119,13 +118,20 @@ class Trainer:
 
             # Joint optimizer for model and domain adversary
             self.optimizer = torch.optim.Adam(
-                list(self.model.parameters())
-                + list(self.domain_adversary.parameters()),
+                list(self.model.parameters()) + list(self.domain_adversary.parameters()),
                 lr=self.lr,
             )
         else:
             # Original optimizer for model only
             self.optimizer = torch.optim.Adam(self.model.parameters(), lr=self.lr)
+
+        # Initialize loss tracking
+        self.train_losses = []
+        self.domain_losses = []
+
+        # Create results directory
+        self.results_dir = "results"
+        os.makedirs(self.results_dir, exist_ok=True)
 
         # Check for Existing Checkpoint
         self.start_epoch = 0
@@ -135,9 +141,7 @@ class Trainer:
         """Run the full training loop with checkpointing and timing."""
         logger.info(f"Training model: {type(self.model).__name__}")
         if self.use_dann and self.domain_adversary is not None:
-            logger.info(
-                f"DANN enabled with lambda={self.dann_lambda}, alpha={self.dann_alpha}"
-            )
+            logger.info(f"DANN enabled with lambda={self.dann_lambda}, alpha={self.dann_alpha}")
 
         self.model.train()
         if self.domain_adversary is not None:
@@ -173,9 +177,7 @@ class Trainer:
                 # === DANN path ===
                 if self.use_dann and self.domain_adversary is not None:
                     # Get the logits and features from the model
-                    output, features = self.model(
-                        text, audio, visual, return_features=True
-                    )
+                    output, features = self.model(text, audio, visual, return_features=True)
                     output = output.view(-1)
 
                     # Main task loss
@@ -206,9 +208,7 @@ class Trainer:
 
             # Compute Average Loss and Elapsed Time
             avg_loss = epoch_loss / len(self.dataloader)
-            avg_domain_loss = (
-                epoch_domain_loss / len(self.dataloader) if self.use_dann else 0.0
-            )
+            avg_domain_loss = epoch_domain_loss / len(self.dataloader) if self.use_dann else 0.0
             elapsed = time.perf_counter() - start_time  # Seconds
 
             logger.info(
@@ -218,8 +218,16 @@ class Trainer:
                 f"Time: {elapsed:.2f}s"
             )
 
+            # Track losses
+            self.train_losses.append(avg_loss)
+            if self.use_dann:
+                self.domain_losses.append(avg_domain_loss)
+
             # Save Checkpoint Each Epoch
             self._save_checkpoint(epoch + 1)
+
+            # Generate and save loss curves
+            self._save_loss_curves()
 
         logger.info("Training Complete.")
 
@@ -240,12 +248,12 @@ class Trainer:
             "dann_alpha": self.dann_alpha,
             "chunk_len": self.chunk_len,
             "chunk_hop": self.chunk_hop,
+            "train_losses": self.train_losses,
+            "domain_losses": self.domain_losses,
         }
 
         if self.domain_adversary is not None:
-            checkpoint["domain_adversary_state_dict"] = (
-                self.domain_adversary.state_dict()
-            )
+            checkpoint["domain_adversary_state_dict"] = self.domain_adversary.state_dict()
 
         torch.save(checkpoint, save_path)
 
@@ -259,9 +267,7 @@ class Trainer:
             # Restore DANN if applicable
             if self.use_dann and "domain_adversary_state_dict" in checkpoint:
                 if self.domain_adversary is not None:
-                    self.domain_adversary.load_state_dict(
-                        checkpoint["domain_adversary_state_dict"]
-                    )
+                    self.domain_adversary.load_state_dict(checkpoint["domain_adversary_state_dict"])
 
             self.optimizer.load_state_dict(checkpoint["optimizer_state_dict"])
 
@@ -278,6 +284,38 @@ class Trainer:
                 )
 
             self.start_epoch = checkpoint.get("epochs_trained", 0)
+
+            # Restore loss history if available
+            self.train_losses = checkpoint.get("train_losses", [])
+            self.domain_losses = checkpoint.get("domain_losses", [])
         else:
             logger.info("No existing checkpoint found — starting fresh.")
             self.start_epoch = 0
+
+    def _save_loss_curves(self):
+        """Generate and save loss curve visualizations."""
+        if len(self.train_losses) == 0:
+            return
+
+        # Determine model type for filename
+        model_type = type(self.model).__name__.lower()
+        base_name = self.model_name.replace(".pt", "")
+
+        # Save training loss curve
+        loss_path = os.path.join(self.results_dir, f"{base_name}_loss_curve.png")
+
+        if self.use_dann and len(self.domain_losses) > 0:
+            # Save combined task and domain loss curves
+            plot_domain_loss_curve(
+                self.train_losses,
+                self.domain_losses,
+                save_path=loss_path,
+                title=f"{model_type.title()} Training Loss Curves",
+            )
+        else:
+            # Save only task loss curve
+            plot_loss_curve(
+                self.train_losses,
+                save_path=loss_path,
+                title=f"{model_type.title()} Training Loss Curve",
+            )

@@ -1,3 +1,4 @@
+import os
 from typing import Dict
 
 import torch
@@ -16,6 +17,7 @@ from src.StaticModel import StaticModel
 from src.TemporalModel import TemporalModel
 from src.utility.collation import temporal_collate_fn, chunked_temporal_collate_fn
 from src.utility.splitting import stratified_patient_split
+from src.utility.visualization import plot_confusion_matrix
 
 
 class Tester:
@@ -53,14 +55,16 @@ class Tester:
         self.chunk_hop = chunk_hop
         self.ckpt_name = ckpt_name
 
+        # Create results directory
+        self.results_dir = "results"
+        os.makedirs(self.results_dir, exist_ok=True)
+
         # Determine Checkpoint Path
         if ckpt_name is not None:
             # Check if .pt extension is present
             if not ckpt_name.endswith(".pt"):
                 ckpt_name += ".pt"
-            self.checkpoint_path = (
-                f"models/{ckpt_name}"  # Get the custom checkpoint path
-            )
+            self.checkpoint_path = f"models/{ckpt_name}"  # Get the custom checkpoint path
         else:
             # Fallback to default naming
             if isinstance(self.model, StaticModel):
@@ -211,6 +215,9 @@ class Tester:
             "targets": all_targets,
         }
 
+        # Generate and save confusion matrix
+        self._save_confusion_matrix(all_targets, preds)
+
         return results
 
     def _load_checkpoint(self):
@@ -221,10 +228,7 @@ class Tester:
 
         # Load DANN if applicable
         if self.use_dann and "domain_adversary_state_dict" in checkpoint:
-            if (
-                hasattr(self.model, "domain_adversary")
-                and self.model.domain_adversary is not None
-            ):
+            if hasattr(self.model, "domain_adversary") and self.model.domain_adversary is not None:
                 self.model.domain_adversary.load_state_dict(
                     checkpoint["domain_adversary_state_dict"]
                 )
@@ -276,3 +280,40 @@ class Tester:
                 shuffle=False,
                 collate_fn=collate_fn,
             )
+
+    def _save_confusion_matrix(self, y_true, y_pred):
+        """Generate and save confusion matrix visualization."""
+        # Determine base name from checkpoint
+        if self.ckpt_name:
+            base_name = self.ckpt_name.replace(".pt", "")
+        else:
+            # Use default naming
+            if isinstance(self.model, StaticModel):
+                base_name = "static_model"
+            elif isinstance(self.model, TemporalModel):
+                if self.use_dann:
+                    base_name = "temporal_model_dann"
+                else:
+                    base_name = "temporal_model"
+            else:
+                base_name = "model"
+
+        # Convert tensors to numpy if needed
+        if torch.is_tensor(y_true):
+            y_true = y_true.cpu().numpy()
+        if torch.is_tensor(y_pred):
+            y_pred = y_pred.cpu().numpy()
+
+        # Generate confusion matrix
+        cm_path = os.path.join(self.results_dir, f"{base_name}_confusion_matrix.png")
+        model_type = type(self.model).__name__
+
+        plot_confusion_matrix(
+            y_true,
+            y_pred,
+            save_path=cm_path,
+            title=f"{model_type} Confusion Matrix",
+            class_names=["No Depression", "Depression"],
+        )
+
+        logger.info(f"Confusion matrix saved to {cm_path}")
