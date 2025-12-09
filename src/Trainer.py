@@ -107,7 +107,9 @@ class Trainer:
         self.domain_adversary = None
         self.domain_criterion = None
 
-        if self.use_dann and not isinstance(model, StaticModel):  # DANN only for Temporal Models
+        if self.use_dann and not isinstance(
+            model, StaticModel
+        ):  # DANN only for Temporal Models
             feature_dim = getattr(
                 self.model, "hidden_dim", 128
             )  # Uses the hidden_dim from model as input size
@@ -118,7 +120,8 @@ class Trainer:
 
             # Joint optimizer for model and domain adversary
             self.optimizer = torch.optim.Adam(
-                list(self.model.parameters()) + list(self.domain_adversary.parameters()),
+                list(self.model.parameters())
+                + list(self.domain_adversary.parameters()),
                 lr=self.lr,
             )
         else:
@@ -141,7 +144,9 @@ class Trainer:
         """Run the full training loop with checkpointing and timing."""
         logger.info(f"Training model: {type(self.model).__name__}")
         if self.use_dann and self.domain_adversary is not None:
-            logger.info(f"DANN enabled with lambda={self.dann_lambda}, alpha={self.dann_alpha}")
+            logger.info(
+                f"DANN enabled with lambda={self.dann_lambda}, alpha={self.dann_alpha}"
+            )
 
         self.model.train()
         if self.domain_adversary is not None:
@@ -177,7 +182,9 @@ class Trainer:
                 # === DANN path ===
                 if self.use_dann and self.domain_adversary is not None:
                     # Get the logits and features from the model
-                    output, features = self.model(text, audio, visual, return_features=True)
+                    output, features = self.model(
+                        text, audio, visual, return_features=True
+                    )
                     output = output.view(-1)
 
                     # Main task loss
@@ -208,7 +215,9 @@ class Trainer:
 
             # Compute Average Loss and Elapsed Time
             avg_loss = epoch_loss / len(self.dataloader)
-            avg_domain_loss = epoch_domain_loss / len(self.dataloader) if self.use_dann else 0.0
+            avg_domain_loss = (
+                epoch_domain_loss / len(self.dataloader) if self.use_dann else 0.0
+            )
             elapsed = time.perf_counter() - start_time  # Seconds
 
             logger.info(
@@ -253,7 +262,9 @@ class Trainer:
         }
 
         if self.domain_adversary is not None:
-            checkpoint["domain_adversary_state_dict"] = self.domain_adversary.state_dict()
+            checkpoint["domain_adversary_state_dict"] = (
+                self.domain_adversary.state_dict()
+            )
 
         torch.save(checkpoint, save_path)
 
@@ -267,7 +278,9 @@ class Trainer:
             # Restore DANN if applicable
             if self.use_dann and "domain_adversary_state_dict" in checkpoint:
                 if self.domain_adversary is not None:
-                    self.domain_adversary.load_state_dict(checkpoint["domain_adversary_state_dict"])
+                    self.domain_adversary.load_state_dict(
+                        checkpoint["domain_adversary_state_dict"]
+                    )
 
             self.optimizer.load_state_dict(checkpoint["optimizer_state_dict"])
 

@@ -64,7 +64,9 @@ class Tester:
             # Check if .pt extension is present
             if not ckpt_name.endswith(".pt"):
                 ckpt_name += ".pt"
-            self.checkpoint_path = f"models/{ckpt_name}"  # Get the custom checkpoint path
+            self.checkpoint_path = (
+                f"models/{ckpt_name}"  # Get the custom checkpoint path
+            )
         else:
             # Fallback to default naming
             if isinstance(self.model, StaticModel):
@@ -228,7 +230,10 @@ class Tester:
 
         # Load DANN if applicable
         if self.use_dann and "domain_adversary_state_dict" in checkpoint:
-            if hasattr(self.model, "domain_adversary") and self.model.domain_adversary is not None:
+            if (
+                hasattr(self.model, "domain_adversary")
+                and self.model.domain_adversary is not None
+            ):
                 self.model.domain_adversary.load_state_dict(
                     checkpoint["domain_adversary_state_dict"]
                 )
