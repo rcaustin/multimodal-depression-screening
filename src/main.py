@@ -88,6 +88,33 @@ def parse_args():
         "Accepts one or more session IDs separated by spaces.",
     )
 
+    parser.add_argument(
+        "--kfold",
+        type=int,
+        default=None,
+        metavar="K",
+        help="Enable K-fold cross-validation with specified number of folds (e.g., 5 or 10). "
+        "When enabled, trains K models and reports aggregated metrics.",
+    )
+
+    parser.add_argument(
+        "--early-stopping",
+        type=int,
+        default=None,
+        metavar="PATIENCE",
+        help="Enable early stopping with specified patience (number of epochs without improvement). "
+        "Example: --early-stopping 10",
+    )
+
+    parser.add_argument(
+        "--early-stopping-metric",
+        type=str,
+        default="f1",
+        choices=["f1", "val_loss", "accuracy", "roc_auc"],
+        help="Metric to monitor for early stopping (default: f1). "
+        "Use 'val_loss' for minimum loss or 'f1'/'accuracy'/'roc_auc' for maximum score.",
+    )
+
     return parser.parse_args()
 
 
@@ -151,7 +178,7 @@ def run_training(
     model, args, use_dann: bool, chunk_len: int | None, chunk_hop: int | None
 ):
     """
-    Execute model training.
+    Execute model training with optional K-fold cross-validation.
 
     Args:
         model: Model instance to train
@@ -160,19 +187,68 @@ def run_training(
         chunk_len: Chunk length in frames (None if disabled)
         chunk_hop: Chunk hop in frames (None if disabled)
     """
-    logger.info("Starting training...")
+    if args.kfold is not None:
+        # K-fold cross-validation mode
+        logger.info(f"Starting {args.kfold}-fold cross-validation...")
 
-    trainer = Trainer(
-        model,
-        batch_size=BATCH_SIZE,
-        epochs=args.epochs,
-        lr=LEARNING_RATE,
-        use_dann=use_dann,
-        chunk_len=chunk_len,
-        chunk_hop=chunk_hop,
-        model_name=args.name,
-    )
-    trainer.run()
+        from src.KFoldTrainer import KFoldTrainer
+
+        # Determine model class
+        model_class = type(model)
+
+        # Determine early stopping mode
+        early_stopping_mode = "min" if args.early_stopping_metric == "val_loss" else "max"
+
+        kfold_trainer = KFoldTrainer(
+            model_class=model_class,
+            k_folds=args.kfold,
+            batch_size=BATCH_SIZE,
+            epochs=args.epochs,
+            lr=LEARNING_RATE,
+            use_dann=use_dann,
+            chunk_len=chunk_len,
+            chunk_hop=chunk_hop,
+            early_stopping_patience=args.early_stopping,
+            early_stopping_metric=args.early_stopping_metric,
+            early_stopping_mode=early_stopping_mode,
+        )
+        kfold_trainer.run()
+
+    else:
+        # Standard training (with optional validation and early stopping)
+        logger.info("Starting standard training...")
+
+        from src.utility.splitting import stratified_patient_split
+
+        # Optionally split into train/val if early stopping enabled
+        if args.early_stopping is not None:
+            train_sessions, val_sessions = stratified_patient_split(
+                test_fraction=0.2,  # Use 20% for validation
+                seed=42,
+            )
+        else:
+            train_sessions, _ = stratified_patient_split()
+            val_sessions = None
+
+        # Determine early stopping mode
+        early_stopping_mode = "min" if args.early_stopping_metric == "val_loss" else "max"
+
+        trainer = Trainer(
+            model,
+            train_sessions=train_sessions,
+            batch_size=BATCH_SIZE,
+            epochs=args.epochs,
+            lr=LEARNING_RATE,
+            use_dann=use_dann,
+            chunk_len=chunk_len,
+            chunk_hop=chunk_hop,
+            model_name=args.name,
+            val_sessions=val_sessions,
+            early_stopping_patience=args.early_stopping,
+            early_stopping_metric=args.early_stopping_metric,
+            early_stopping_mode=early_stopping_mode,
+        )
+        trainer.run()
 
     logger.info("Training complete.")
 

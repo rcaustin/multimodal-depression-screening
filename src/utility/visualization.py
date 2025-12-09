@@ -170,3 +170,49 @@ def plot_domain_loss_curve(
         plt.close()
     else:
         plt.show()
+
+
+def plot_validation_metrics(
+    val_accuracies: List[float],
+    val_f1_scores: List[float],
+    val_roc_aucs: List[float],
+    save_path: Optional[str] = None,
+    title: str = "Validation Metrics",
+):
+    """
+    Plot validation metrics (accuracy, F1, AUC) over epochs.
+
+    Args:
+        val_accuracies: List of validation accuracies per epoch
+        val_f1_scores: List of validation F1 scores per epoch
+        val_roc_aucs: List of validation ROC-AUC scores per epoch
+        save_path: Path to save the figure (if None, displays instead)
+        title: Title for the plot
+    """
+    plt.figure(figsize=(10, 6))
+
+    epochs = range(1, len(val_accuracies) + 1)
+
+    plt.plot(epochs, val_accuracies, "b-", linewidth=2, label="Accuracy", marker="o")
+    plt.plot(epochs, val_f1_scores, "r-", linewidth=2, label="F1 Score", marker="s")
+    plt.plot(epochs, val_roc_aucs, "g-", linewidth=2, label="ROC-AUC", marker="^")
+
+    plt.xlabel("Epoch", fontsize=12)
+    plt.ylabel("Score", fontsize=12)
+    plt.title(title, fontsize=14, fontweight="bold")
+    plt.legend(fontsize=10)
+    plt.grid(True, alpha=0.3)
+    plt.ylim([0.0, 1.0])  # Metrics are in [0, 1]
+
+    # Add minor gridlines for better readability
+    plt.grid(True, which="minor", alpha=0.1)
+    plt.minorticks_on()
+
+    plt.tight_layout()
+
+    if save_path:
+        os.makedirs(os.path.dirname(save_path), exist_ok=True)
+        plt.savefig(save_path, dpi=300, bbox_inches="tight")
+        plt.close()
+    else:
+        plt.show()
