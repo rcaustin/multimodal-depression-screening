@@ -155,7 +155,8 @@ class Tester:
                         # Safety check, make sure labels match
                         if session_targets[sid] != targ_int:
                             logger.warning(
-                                f"Conflicting labels for session {sid}, {session_targets[sid]} vs {targ_int}"
+                                f"Conflicting labels for session {sid}, {session_targets[sid]}"
+                                f" vs {targ_int}"
                             )
                     session_targets[sid] = targ_int
 
