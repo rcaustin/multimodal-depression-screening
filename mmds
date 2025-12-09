@@ -1,6 +1,0 @@
-#!/usr/bin/env bash
-
-#Before running, make executable:
-#chmod +x mmds
-
-python -m src.main "$@"
